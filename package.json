@@ -1,0 +1,24 @@
+{
+  "name": "museum-vr-sandbox",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Independent WebXR museum VR sandbox for testing (EARNOVAGAMING).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0",
+    "@react-three/fiber": "^8.17.10",
+    "@react-three/drei": "^9.114.0",
+    "@react-three/xr": "^6.2.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.10"
+  }
+}
