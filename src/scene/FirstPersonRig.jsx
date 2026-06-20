@@ -6,13 +6,23 @@ import { LAYOUT_SCALE } from '../data/museumMapModel'
 
 const EYE = 1.65
 const S = LAYOUT_SCALE
+const RAD = 0.2 // player clearance from walls, in plan units (~0.5m)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+
+// shortest distance from point (px,pz) to segment a→b (all plan coords)
+function distToSeg(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az
+  const l2 = dx * dx + dz * dz
+  let t = l2 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0
+  t = Math.max(0, Math.min(1, t))
+  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz))
+}
 
 // First-person walk. LOOK = drag a finger on the 3D view (tracked by its own
 // pointerId + pointer capture, so it never fights the joystick — you can look
 // and walk at the same time). MOVE = the joystick / WASD. Collision keeps you
 // inside the level footprint (you can't leave the building).
-export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], footprint = [], speed = 6 }) {
+export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], footprint = [], walls = [], speed = 6 }) {
   const { camera, gl } = useThree()
   const yaw = useRef(Math.PI)
   const pitch = useRef(0)
@@ -57,9 +67,15 @@ export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], footprint =
     }
   }, [gl])
 
+  // free if inside the footprint AND clear of every (opening-carved) wall segment
   const inside = (wx, wz) => {
-    if (!footprint || footprint.length < 3) return true
-    return pointInFootprint(footprint, wx / S, wz / S)
+    const px = wx / S, pz = wz / S
+    if (footprint && footprint.length >= 3 && !pointInFootprint(footprint, px, pz)) return false
+    for (let i = 0; i < walls.length; i++) {
+      const s = walls[i]
+      if (distToSeg(px, pz, s.a.x, s.a.z, s.b.x, s.b.z) < RAD) return false
+    }
+    return true
   }
 
   useFrame((_, dt) => {

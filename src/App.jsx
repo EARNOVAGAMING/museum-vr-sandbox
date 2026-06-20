@@ -6,6 +6,7 @@ import MuseumMap from './scene/MuseumMap.jsx'
 import FirstPersonRig from './scene/FirstPersonRig.jsx'
 import Joystick from './ui/Joystick.jsx'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from './data/museumMapModel'
+import { buildLevelSpec } from './data/museumMapScene'
 
 const store = createXRStore()
 const FLOOR_GAP = 0.6
@@ -20,15 +21,17 @@ export default function App() {
     const lv = (map.levels || []).slice(0, 1)
     let y = 0
     return lv.map((l, i) => {
-      const sp = l.spawn || { x: 0, z: 0 }
+      const spec = buildLevelSpec(l)
+      const sp = spec.spawn || { x: 0, z: 0 }
       const info = {
-        name: l.name || `Level 0${i + 1}`,
+        name: spec.name || `Level 0${i + 1}`,
         short: `L${i + 1}`,
         floorY: y,
         spawn: [sp.x * LAYOUT_SCALE, sp.z * LAYOUT_SCALE],
-        footprint: l.footprint || [],
+        footprint: spec.footprint || [],
+        walls: spec.wallSegments || [],
       }
-      y += (l.height || 3) * HEIGHT_SCALE + FLOOR_GAP
+      y += (spec.height || 3) * HEIGHT_SCALE + FLOOR_GAP
       return info
     })
   }, [])
@@ -68,7 +71,7 @@ export default function App() {
         <XR store={store}>
           <MuseumMap />
           {mode === 'walk' ? (
-            <FirstPersonRig floorY={cur.floorY} spawn={cur.spawn} footprint={cur.footprint} />
+            <FirstPersonRig floorY={cur.floorY} spawn={cur.spawn} footprint={cur.footprint} walls={cur.walls} />
           ) : (
             <OrbitControls
               target={[0, 5, 0]}
