@@ -176,6 +176,15 @@ function Level({ spec, yOffset }) {
       {spec.wallSegments.map((seg, i) => (
         <WallSeg key={i} a={seg.a} b={seg.b} height={seg.height || spec.height} color={spec.wallColor} roughness={spec.wallRoughness ?? 0.75} y={yOffset} />
       ))}
+      {/* zone "area" pools — subtle tinted floor patches at each labelled zone */}
+      {spec.zones.map((z, i) => (
+        z.center ? (
+          <mesh key={`z${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[z.center.x * S, yOffset + 0.02, z.center.z * S]}>
+            <circleGeometry args={[1.9, 40]} />
+            <meshStandardMaterial color={z.tint || accent} transparent opacity={0.13} roughness={0.9} />
+          </mesh>
+        ) : null
+      ))}
       {spec.objects.map((o) => (
         <PlacedObject key={o.id} o={o} floorY={yOffset} accent={accent} />
       ))}
@@ -193,14 +202,13 @@ function Level({ spec, yOffset }) {
 }
 
 export default function MuseumMap() {
-  const levels = useMemo(() => {
+  // First floor only for now — Aidil's full Level 01 (entrance, reception,
+  // staircase, all placed objects). Second floor is parked until L1 is dialled in.
+  const l1 = useMemo(() => {
     const map = createAomMuseumMap()
-    return (map.levels || []).slice(0, 2).map((lvl) => buildLevelSpec(lvl))
+    const lvl = (map.levels || [])[0]
+    return lvl ? buildLevelSpec(lvl) : null
   }, [])
-
-  const l1 = levels[0]
-  const l2 = levels[1]
-  const l2Offset = l1 ? l1.height * HS + FLOOR_GAP : 0
 
   return (
     <group>
@@ -209,7 +217,6 @@ export default function MuseumMap() {
       <directionalLight position={[6, 18, 8]} intensity={0.9} castShadow />
       <directionalLight position={[-8, 16, -6]} intensity={0.5} />
       {l1 && <Level spec={l1} yOffset={0} />}
-      {l2 && <Level spec={l2} yOffset={l2Offset} />}
     </group>
   )
 }

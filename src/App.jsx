@@ -17,7 +17,7 @@ export default function App() {
   // Floor spawn points + heights, derived from the real floorplan data.
   const floors = useMemo(() => {
     const map = createAomMuseumMap()
-    const lv = (map.levels || []).slice(0, 2)
+    const lv = (map.levels || []).slice(0, 1)
     let y = 0
     return lv.map((l, i) => {
       const sp = l.spawn || { x: 0, z: 0 }
@@ -49,7 +49,7 @@ export default function App() {
           <button className={`ui-btn ${mode === 'walk' ? 'active' : ''}`} onClick={() => setMode('walk')}>Walk</button>
           <button className={`ui-btn ${mode === 'overview' ? 'active' : ''}`} onClick={() => setMode('overview')}>Overview</button>
         </div>
-        {mode === 'walk' && (
+        {mode === 'walk' && floors.length > 1 && (
           <div className="ui-row">
             {floors.map((f, i) => (
               <button key={i} className={`ui-btn ${floor === i ? 'active' : ''}`} onClick={() => setFloor(i)}>{f.short}</button>
