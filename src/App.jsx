@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { createXRStore, XR } from '@react-three/xr'
 import Museum from './scene/Museum.jsx'
 
@@ -11,28 +11,31 @@ export default function App() {
   return (
     <>
       <div className="hint">
-        <strong>Museum VR Sandbox</strong>
+        <strong>Asian Operatic Museum — VR Gallery</strong>
         <br />
-        Desktop: drag to look, scroll to zoom.
+        Phone / desktop: drag to look around, pinch / scroll to move closer.
         <br />
         Headset: tap “Enter VR”.
       </div>
 
       <Canvas
         shadows
-        camera={{ position: [0, 1.6, 6], fov: 60 }}
+        camera={{ position: [0, 1.7, 7], fov: 62 }}
         gl={{ antialias: true }}
       >
         <color attach="background" args={['#0b0b0f']} />
         <XR store={store}>
           <Museum />
-          {/* OrbitControls is desktop-only; it is inert inside an XR session. */}
+          {/* OrbitControls is desktop/touch only; inert inside an XR session. */}
           <OrbitControls
-            target={[0, 1.4, 0]}
-            maxPolarAngle={Math.PI / 2}
+            target={[0, 1.9, -2]}
+            maxPolarAngle={Math.PI / 2.05}
+            minDistance={1.5}
+            maxDistance={11}
             enablePan={false}
+            enableDamping
+            dampingFactor={0.08}
           />
-          <Environment preset="apartment" />
         </XR>
       </Canvas>
 
