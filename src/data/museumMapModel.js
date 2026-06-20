@@ -143,104 +143,79 @@ function wall(ax, az, bx, bz, openings = [], height = null) {
 }
 
 // ---------------------------------------------------------------------------
-// LEVEL 01 — ENTRANCE (blueprint envelope 3.27m × 5.52m; inner room 2.70m wide).
-// A compact arrival vestibule: welcome LED, reception/POS, the Sang Nila Utama
-// hologram, a merch slat-wall, and the staircase up to Level 02.
+// LEVEL 01 — ENTRANCE. Simple rectangular hall: warm wood floor, dark rough
+// walls, straight staircase on the left, large illuminated welcome mural on
+// the back-centre wall, glowing pyramid plinth left of centre.
 // ---------------------------------------------------------------------------
 function buildLevel01() {
-  const W = 3.27;
-  const D = 5.52;
-  const hx = W / 2; // 1.635
-  const hz = D / 2; // 2.76
-  const H = 3.0;
-  // The unit is NOT a plain rectangle: the upper room is 2700 wide, and the
-  // lower-right (the Welcome-LED bay by the entrance) PROTRUDES out to the full
-  // 3270 width. So the footprint is an L — the upper-right corner is cut in.
-  const mainRightX = hx - 0.57; // = 1.065, the 2700-wide main room's right wall
-  const bayZ = hz - 1.85;       // = 0.91, where the lower-right bay protrudes out
+  const W = 4.2;   // room width
+  const D = 4.0;   // room depth
+  const H = 3.0;   // ceiling height
+  const hx = W / 2;  // 2.1
+  const hz = D / 2;  // 2.0
+
   const footprint = [
-    { x: -hx, z: -hz },         // NW
-    { x: mainRightX, z: -hz },  // NE of the 2700 main room
-    { x: mainRightX, z: bayZ }, // down to the bay
-    { x: hx, z: bayZ },         // OUT into the protruding Welcome bay
-    { x: hx, z: hz },           // SE
-    { x: -hx, z: hz },          // SW
+    { x: -hx, z: -hz },
+    { x:  hx, z: -hz },
+    { x:  hx, z:  hz },
+    { x: -hx, z:  hz },
   ];
-  // Layout from the floorplan's WALKING FLOW (pink arrows) + the video. You enter
-  // and the reception faces you. The WELCOME lightbox is CLOSE on the right. The
-  // FIRST flight climbs on the LEFT to a back landing; you TURN RIGHT and the
-  // SECOND flight climbs back south on the RIGHT, BEHIND the welcome wall, up to
-  // Level 02 — an L into a U.
-  const RECEP = 0.4;         // reception platform height
-  const MIDLAND = 1.5;        // U-stair landing height
-  const entranceCenterX = 0.5;
-  const entranceAt = (entranceCenterX + hx) / W;
-  const welcomeZ = 1.0;      // welcome wall — CLOSE to the entrance, in the bay
-  // The reception platform + U-staircase FILL the room flush to the walls (no
-  // floor gaps): the platform fills the south-left to the front + left walls; the
-  // LEFT flight fills the left half flush to the left wall; the landing spans the
-  // back wall; the RIGHT flight fills the right half behind the welcome wall. The
-  // central stringer (midX) closes the seam between the two flights.
-  const midX = -0.125;
-  const stairBackZ = -1.6;   // where the flights meet the back landing
-  const stairFrontZ = 0.4;   // where the lower flight meets the reception platform
+
+  // Entrance opening right-of-centre on the front wall.
   const walls = [
-    wall(-hx, -hz, mainRightX, -hz),                          // back (main room)
-    wall(mainRightX, -hz, mainRightX, bayZ),                  // main-room right wall
-    wall(mainRightX, bayZ, hx, bayZ),                         // bay north wall (step-out)
-    wall(hx, bayZ, hx, hz),                                   // bay right wall
-    wall(hx, hz, -hx, hz, [{ at: 1 - entranceAt, width: 1.1 }]), // front (entrance)
-    wall(-hx, hz, -hx, -hz),                                  // left wall
-    // WELCOME WALL — close, in the right bay, facing the door. Extended WEST to
-    // the RIGHT flight's edge (x -0.1) so it covers the full width of the second-
-    // floor stairs behind it — a seamless wall with no gap at the stair edge.
-    wall(-0.1, welcomeZ, hx, welcomeZ),
-    // Central stringer closing the U-stair's stairwell seam between the flights.
-    wall(midX, stairBackZ, midX, stairFrontZ, [], MIDLAND),
+    wall(-hx, -hz,  hx, -hz),                                // back wall
+    wall( hx, -hz,  hx,  hz),                                // right wall
+    wall( hx,  hz, -hx,  hz, [{ at: 0.62, width: 1.1 }]),   // front wall + entrance
+    wall(-hx,  hz, -hx, -hz),                                // left wall
   ];
+
   const zones = [
-    { id: "l1_lobby", name: "Entrance — Welcome", tint: "#e7c789", center: { x: 0.7, z: 1.95 } },
-    { id: "l1_recep", name: "Reception", tint: "#a0d0ff", center: { x: -1.2, z: 1.85 } },
-    { id: "l1_stair", name: "Staircase to Level 02", tint: "#8fb2ff", center: { x: midX, z: -0.7 } },
+    { id: "l1_entrance", name: "Entrance", tint: "#e7c789", center: { x: 0.6, z: 0.8 } },
+    { id: "l1_stair",   name: "Staircase", tint: "#8fb2ff", center: { x: -1.6, z: 0.0 } },
   ];
+
+  const STAIR_H = 1.5;   // total rise of the staircase flight
+  const STAIR_D = 2.6;   // run (depth) of the flight
+
   const objects = [
-    // WELCOME lightbox — CLOSE ahead in the right bay, on the entrance-facing
-    // (south) face of the welcome wall.
-    obj("led_panel", 0.75, welcomeZ + 0.12, { y: 0.88, rotationY: 0, color: "#6e4a26", title: "Welcome — Asian Operatic Museum", zone: "l1_lobby", size: { w: 1.3, h: 0.85 } }),
-    // Map kiosk — left wall by the entrance (the floorplan screen in the video).
-    obj("led_panel", -hx + 0.1, 1.6, { y: 1.05, rotationY: 90, title: "Museum Guide — Map", zone: "l1_recep", size: { w: 0.8, h: 1.5 } }),
-    // Reception PLATFORM — raised, FILLING the south-left corner flush to the
-    // LEFT and FRONT walls (x[-hx,-0.1], z[+0.35,front]); the LEFT flight rises
-    // straight off its north edge.
-    obj("platform", -0.8675, 1.555, { title: "Reception", zone: "l1_recep", size: { w: 1.535, h: RECEP, d: 2.41 } }),
-    // Steps up onto the platform along its WHOLE EAST edge (FACING THE WELCOME):
-    // span the full platform depth so the stepped front blends seamlessly into
-    // the platform, flush to the front + back walls.
-    obj("stairs", -0.4, 1.555, { rotationY: 90, title: "Steps up to Reception", zone: "l1_recep", size: { w: 2.41, h: RECEP, d: 0.6 } }),
-    // Reception desk — against the LEFT wall, ROTATED 90° (faces into the room),
-    // a touch shorter, on the platform.
-    obj("desk", -hx + 0.32, 1.6, { y: RECEP, rotationY: 90, title: "Reception / POS", zone: "l1_recep", size: { w: 1.1, h: 0.82, d: 0.5 } }),
-    // STAIRCASE — L into U, FILLING the room flush to the walls. LEFT flight fills
-    // the left half (flush to the left wall), rising FROM the reception platform.
-    obj("stairs", -0.8925, -0.6, { y: RECEP, rotationY: 0, title: "Staircase — lower flight (left)", zone: "l1_stair", size: { w: 1.485, h: MIDLAND - RECEP, d: 2.0 } }),
-    // …back landing spanning the BACK WALL flush to the side walls (turn RIGHT)…
-    obj("platform", -0.285, -2.13, { title: "Stair landing", zone: "l1_stair", size: { w: 2.7, h: MIDLAND, d: 1.26 } }),
-    // …RIGHT flight fills the right half (flush to the right wall), climbing back
-    // south behind the welcome wall — extended all the way to the WELCOME WALL so
-    // the stair top is flush against it (no gap).
-    obj("stairs", 0.4825, -0.3, { y: MIDLAND, rotationY: 180, title: "Stairs up to Level 02", zone: "l1_stair", linkLevelId: "level_02", size: { w: 1.165, h: 1.4, d: 2.6 } }),
+    // Large welcome mural — back wall, centre-right, tall and prominent.
+    obj("video_wall", 0.5, -hz + 0.1, {
+      y: 0.1, rotationY: 0,
+      title: "Welcome to Asian Operatic Museum",
+      zone: "l1_entrance",
+      color: "#c8702a",
+      size: { w: 1.9, h: 2.6 },
+    }),
+    // Glowing pyramid plinth — left of centre, facing the entrance.
+    obj("plinth", -0.9, 0.4, {
+      title: "Illuminated Pyramid",
+      zone: "l1_entrance",
+      color: "#ffcc44",
+      size: { w: 0.42, h: 0.75, d: 0.42 },
+    }),
+    // Straight staircase on the left wall, rising toward the back.
+    obj("stairs", -hx + 0.55, -0.1, {
+      y: 0, rotationY: 0,
+      title: "Staircase to Level 02",
+      zone: "l1_stair",
+      linkLevelId: "level_02",
+      size: { w: 1.0, h: STAIR_H, d: STAIR_D },
+    }),
   ];
-  // Cinematic fixtures — recessed warm ceiling spots, a ceiling spot + floor
-  // baseboard uplight washing the welcome lightbox, and an entrance pool.
+
   const lights = [
-    { x: 0.85, y: H - 0.22, z: 1.3, color: "#ffd2a0", intensity: 9, range: 3.4 },   // over welcome
-    { x: 0.85, y: 0.25, z: welcomeZ + 0.18, color: "#ffc090", intensity: 7, range: 2.4 }, // baseboard glow
-    { x: 0.3, y: H - 0.22, z: 2.0, color: "#ffd9a8", intensity: 7, range: 3.4 },   // entrance
-    { x: -0.89, y: H - 0.22, z: -0.6, color: "#ffe1b0", intensity: 8, range: 4.2 }, // over left flight
-    { x: -0.285, y: H - 0.22, z: -2.0, color: "#ffe1b0", intensity: 8, range: 4.4 }, // over landing
-    { x: 0.48, y: H - 0.22, z: -0.3, color: "#ffe1b0", intensity: 8, range: 4.2 }, // over right flight
-    { x: -1.0, y: H - 0.3, z: 1.7, color: "#ffe1b0", intensity: 6, range: 3.0 }, // reception
+    // Recessed ceiling spot directly over the mural — bright, focused.
+    { x: 0.5,  y: H - 0.1, z: -hz + 1.1, color: "#fff8ee", intensity: 14, range: 4.0 },
+    // Warm floor glow washing up the mural from below.
+    { x: 0.5,  y: 0.2,     z: -hz + 0.5, color: "#ffaa44", intensity:  6, range: 2.8 },
+    // Soft fill over the stair area so the steps are readable.
+    { x: -hx + 0.6, y: H - 0.3, z: 0.0, color: "#ffe0a0", intensity:  7, range: 4.5 },
+    // Entrance pool — warm welcome light as you walk in.
+    { x: 0.6,  y: H - 0.4, z: hz - 0.6,  color: "#ffd9a8", intensity:  6, range: 3.5 },
+    // Pyramid glow — small warm point from the plinth object.
+    { x: -0.9, y: 1.1,     z: 0.4,        color: "#ffdd55", intensity:  4, range: 2.5 },
   ];
+
   return {
     id: "level_01",
     name: "Level 01 — Entrance",
@@ -251,11 +226,10 @@ function buildLevel01() {
     ridgeHeight: null,
     wallStyle: "dark_museum_wall",
     floorStyle: "warm_wood_floor",
-    wallRoughness: 0.7,   // smooth charcoal walls (video look)
-    floorRoughness: 0.4,  // warm wood with a soft sheen
-    mood: { ambient: 0.3, accent: "#ffcaa0", background: "#0a0807" },
-    // Spawn right at the door, facing up the corridor at the welcome lightbox.
-    spawn: { x: entranceCenterX, z: hz - 0.35, rotationY: 180 },
+    wallRoughness: 0.95,
+    floorRoughness: 0.35,
+    mood: { ambient: 0.32, accent: "#ffcc44", background: "#0a0807" },
+    spawn: { x: 0.6, z: hz - 0.4, rotationY: 180 },
     walls,
     zones,
     objects,
