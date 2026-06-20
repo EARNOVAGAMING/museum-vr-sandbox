@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { Text } from '@react-three/drei'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from '../data/museumMapModel'
 import { buildLevelSpec } from '../data/museumMapScene'
+import { woodTexture, plasterTexture, marbleTexture } from '../textures/procedural'
 
 // Clean R3F renderer for Aidil's real AOM floorplan data (museumMapModel.js).
 // We reuse his DATA (footprints, walls, zones, placed objects, stairs) and draw
@@ -17,7 +18,7 @@ const WALL_T = 0.12
 const FLOOR_GAP = 0.6 // vertical gap between a level's ceiling and the next floor
 
 // ── one wall segment (a→b, already opening-carved by splitWall) ──
-function WallSeg({ a, b, height, color, roughness = 0.8, y }) {
+function WallSeg({ a, b, height, color, roughness = 0.8, y, map }) {
   const ax = a.x * S, az = a.z * S, bx = b.x * S, bz = b.z * S
   const dx = bx - ax, dz = bz - az
   const len = Math.hypot(dx, dz)
@@ -27,13 +28,13 @@ function WallSeg({ a, b, height, color, roughness = 0.8, y }) {
   return (
     <mesh position={[(ax + bx) / 2, y + h / 2, (az + bz) / 2]} rotation={[0, -angle, 0]} castShadow receiveShadow>
       <boxGeometry args={[len + WALL_T, h, WALL_T]} />
-      <meshStandardMaterial color={color} roughness={roughness} />
+      <meshStandardMaterial color={color} roughness={roughness} map={map || null} />
     </mesh>
   )
 }
 
 // ── footprint polygon → a flat slab (floor or ceiling) ──
-function Slab({ points, color, roughness = 0.5, y, emissive }) {
+function Slab({ points, color, roughness = 0.5, y, map }) {
   const geom = useMemo(() => {
     const shape = new THREE.Shape()
     points.forEach((p, i) => {
@@ -42,17 +43,19 @@ function Slab({ points, color, roughness = 0.5, y, emissive }) {
       else shape.lineTo(x, z)
     })
     shape.closePath()
-    return new THREE.ShapeGeometry(shape)
+    const g = new THREE.ShapeGeometry(shape)
+    g.computeBoundingBox()
+    return g
   }, [points])
   return (
     <mesh geometry={geom} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
-      <meshStandardMaterial color={color} roughness={roughness} side={THREE.DoubleSide} emissive={emissive || '#000'} emissiveIntensity={emissive ? 0.25 : 0} />
+      <meshStandardMaterial color={color} roughness={roughness} side={THREE.DoubleSide} map={map || null} />
     </mesh>
   )
 }
 
 // ── a single placed exhibit, drawn by type ──
-function PlacedObject({ o, floorY, accent }) {
+function PlacedObject({ o, floorY, accent, marble }) {
   const x = o.position.x * S
   const z = o.position.z * S
   const r = (o.rotationY || 0) * Math.PI / 180
@@ -87,7 +90,7 @@ function PlacedObject({ o, floorY, accent }) {
     case 'plinth':
       body = (
         <group>
-          <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#e8e3d6" roughness={0.6} /></mesh>
+          <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#e8e3d6" roughness={0.5} map={marble || null} /></mesh>
           <mesh position={[0, h + 0.18, 0]} castShadow><torusKnotGeometry args={[0.14, 0.05, 90, 12]} /><meshStandardMaterial color={col} metalness={0.6} roughness={0.25} /></mesh>
         </group>
       )
@@ -169,12 +172,18 @@ function PlacedObject({ o, floorY, accent }) {
 function Level({ spec, yOffset }) {
   const accent = spec.mood?.accent || '#e7c789'
   const ceilY = yOffset + spec.height * HS
+  const tex = useMemo(() => {
+    const wood = woodTexture(); wood.repeat.set(0.5, 0.5)
+    const plaster = plasterTexture(spec.wallColor); plaster.repeat.set(3, 1.5)
+    const marble = marbleTexture()
+    return { wood, plaster, marble }
+  }, [spec.wallColor])
   return (
     <group>
-      <Slab points={spec.footprint} color={spec.floorColor} roughness={spec.floorRoughness ?? 0.5} y={yOffset} />
-      <Slab points={spec.footprint} color={spec.wallColor} roughness={1} y={ceilY} />
+      <Slab points={spec.footprint} color={spec.floorColor} roughness={spec.floorRoughness ?? 0.55} y={yOffset} map={tex.wood} />
+      <Slab points={spec.footprint} color={spec.wallColor} roughness={1} y={ceilY} map={tex.plaster} />
       {spec.wallSegments.map((seg, i) => (
-        <WallSeg key={i} a={seg.a} b={seg.b} height={seg.height || spec.height} color={spec.wallColor} roughness={spec.wallRoughness ?? 0.75} y={yOffset} />
+        <WallSeg key={i} a={seg.a} b={seg.b} height={seg.height || spec.height} color={spec.wallColor} roughness={spec.wallRoughness ?? 0.75} y={yOffset} map={tex.plaster} />
       ))}
       {/* zone "area" pools — subtle tinted floor patches at each labelled zone */}
       {spec.zones.map((z, i) => (
@@ -186,7 +195,7 @@ function Level({ spec, yOffset }) {
         ) : null
       ))}
       {spec.objects.map((o) => (
-        <PlacedObject key={o.id} o={o} floorY={yOffset} accent={accent} />
+        <PlacedObject key={o.id} o={o} floorY={yOffset} accent={accent} marble={tex.marble} />
       ))}
       {/* a bright fill over the centre of each floor so the dark walls read */}
       <pointLight position={[spec.bounds.cx * S, yOffset + spec.height * HS * 0.85, spec.bounds.cz * S]} intensity={6} distance={spec.bounds.halfMax * S * 2.6} decay={1.4} color="#fff3e0" />

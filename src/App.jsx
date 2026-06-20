@@ -26,6 +26,7 @@ export default function App() {
         short: `L${i + 1}`,
         floorY: y,
         spawn: [sp.x * LAYOUT_SCALE, sp.z * LAYOUT_SCALE],
+        footprint: l.footprint || [],
       }
       y += (l.height || 3) * HEIGHT_SCALE + FLOOR_GAP
       return info
@@ -67,7 +68,7 @@ export default function App() {
         <XR store={store}>
           <MuseumMap />
           {mode === 'walk' ? (
-            <FirstPersonRig floorY={cur.floorY} spawn={cur.spawn} />
+            <FirstPersonRig floorY={cur.floorY} spawn={cur.spawn} footprint={cur.footprint} />
           ) : (
             <OrbitControls
               target={[0, 5, 0]}

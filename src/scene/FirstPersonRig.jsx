@@ -1,48 +1,66 @@
 import { useEffect, useRef } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
 import { ctl, attachKeyboard } from '../controls/firstPerson'
+import { pointInFootprint } from '../data/museumMapScene'
+import { LAYOUT_SCALE } from '../data/museumMapModel'
 
 const EYE = 1.65
+const S = LAYOUT_SCALE
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
-// First-person walk: drag anywhere to look (mouse + touch), WASD / on-screen
-// joystick to move at eye height on the current floor. No collision yet — free
-// XZ movement, fixed height — so you can preview the space as a visitor.
-export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], speed = 7 }) {
+// First-person walk. LOOK = drag a finger on the 3D view (tracked by its own
+// pointerId + pointer capture, so it never fights the joystick — you can look
+// and walk at the same time). MOVE = the joystick / WASD. Collision keeps you
+// inside the level footprint (you can't leave the building).
+export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], footprint = [], speed = 6 }) {
   const { camera, gl } = useThree()
   const yaw = useRef(Math.PI)
   const pitch = useRef(0)
+  const lookId = useRef(null)
+  const last = useRef(null)
 
-  // Reposition on floor change.
   useEffect(() => {
     camera.position.set(spawn[0], floorY + EYE, spawn[1])
   }, [camera, floorY, spawn])
 
   useEffect(() => {
-    const detachK = attachKeyboard()
     const el = gl.domElement
-    let last = null
-    const pt = (e) => ({ x: e.clientX ?? e.touches?.[0]?.clientX ?? 0, y: e.clientY ?? e.touches?.[0]?.clientY ?? 0 })
-    const onDown = (e) => { last = pt(e) }
-    const onMove = (e) => {
-      if (!last) return
-      const p = pt(e)
-      yaw.current -= (p.x - last.x) * 0.004
-      pitch.current = clamp(pitch.current - (p.y - last.y) * 0.004, -1.2, 1.2)
-      last = p
+    const onDown = (e) => {
+      if (lookId.current !== null) return
+      lookId.current = e.pointerId
+      last.current = { x: e.clientX, y: e.clientY }
+      try { el.setPointerCapture(e.pointerId) } catch { /* ignore */ }
     }
-    const onUp = () => { last = null }
+    const onMove = (e) => {
+      if (e.pointerId !== lookId.current || !last.current) return
+      yaw.current -= (e.clientX - last.current.x) * 0.0035
+      pitch.current = clamp(pitch.current - (e.clientY - last.current.y) * 0.0035, -1.1, 1.1)
+      last.current = { x: e.clientX, y: e.clientY }
+    }
+    const onUp = (e) => {
+      if (e.pointerId !== lookId.current) return
+      lookId.current = null
+      last.current = null
+      try { el.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
+    }
     el.addEventListener('pointerdown', onDown)
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
+    const detachK = attachKeyboard()
     return () => {
-      detachK()
       el.removeEventListener('pointerdown', onDown)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+      detachK()
     }
   }, [gl])
+
+  const inside = (wx, wz) => {
+    if (!footprint || footprint.length < 3) return true
+    return pointInFootprint(footprint, wx / S, wz / S)
+  }
 
   useFrame((_, dt) => {
     camera.rotation.order = 'YXZ'
@@ -54,12 +72,22 @@ export default function FirstPersonRig({ floorY = 0, spawn = [0, 0], speed = 7 }
     if (f || s) {
       const sin = Math.sin(yaw.current)
       const cos = Math.cos(yaw.current)
-      // forward = (-sin, 0, -cos), right = (cos, 0, -sin)
-      const dx = f * -sin + s * cos
-      const dz = f * -cos + s * -sin
+      let dx = f * -sin + s * cos
+      let dz = f * -cos + s * -sin
       const len = Math.hypot(dx, dz) || 1
-      camera.position.x += (dx / len) * speed * dt
-      camera.position.z += (dz / len) * speed * dt
+      const stepX = (dx / len) * speed * dt
+      const stepZ = (dz / len) * speed * dt
+      const px = camera.position.x
+      const pz = camera.position.z
+      // wall-slide against the footprint outline
+      if (inside(px + stepX, pz + stepZ)) {
+        camera.position.x = px + stepX
+        camera.position.z = pz + stepZ
+      } else if (inside(px + stepX, pz)) {
+        camera.position.x = px + stepX
+      } else if (inside(px, pz + stepZ)) {
+        camera.position.z = pz + stepZ
+      }
     }
     camera.position.y = floorY + EYE
   })
