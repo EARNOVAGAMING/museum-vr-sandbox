@@ -147,15 +147,41 @@ function PlacedObject({ o, floorY, accent, marble }) {
       )
       break
     case 'stairs': {
-      const steps = 8
+      const steps = 10
+      const railH = Math.min(h * 0.9, 1.0)
+      const postEvery = Math.max(1, Math.floor(steps / 4))
       body = (
         <group>
+          {/* treads */}
           {Array.from({ length: steps }, (_, i) => (
             <mesh key={i} position={[0, (i + 0.5) * (h / steps), -d / 2 + (i + 0.5) * (d / steps)]} castShadow receiveShadow>
-              <boxGeometry args={[w, h / steps, d / steps]} />
-              <meshStandardMaterial color="#6a5238" roughness={0.7} />
+              <boxGeometry args={[w, h / steps * 0.72, d / steps]} />
+              <meshStandardMaterial color="#5a3c24" roughness={0.65} />
             </mesh>
           ))}
+          {/* left handrail bar */}
+          <mesh position={[-w / 2 + 0.06, h / 2 + railH, 0]} rotation={[Math.atan2(h, d), 0, 0]} castShadow>
+            <boxGeometry args={[0.06, 0.06, Math.hypot(h, d) + 0.1]} />
+            <meshStandardMaterial color="#8a9aaa" metalness={0.75} roughness={0.25} />
+          </mesh>
+          {/* right handrail bar */}
+          <mesh position={[w / 2 - 0.06, h / 2 + railH, 0]} rotation={[Math.atan2(h, d), 0, 0]} castShadow>
+            <boxGeometry args={[0.06, 0.06, Math.hypot(h, d) + 0.1]} />
+            <meshStandardMaterial color="#8a9aaa" metalness={0.75} roughness={0.25} />
+          </mesh>
+          {/* vertical balusters */}
+          {Array.from({ length: steps }, (_, i) => i % postEvery === 0 ? (
+            <mesh key={`p${i}`} position={[-w / 2 + 0.06, (i / steps) * h + railH / 2, -d / 2 + (i / steps) * d]} castShadow>
+              <boxGeometry args={[0.05, railH, 0.05]} />
+              <meshStandardMaterial color="#8a9aaa" metalness={0.7} roughness={0.3} />
+            </mesh>
+          ) : null)}
+          {Array.from({ length: steps }, (_, i) => i % postEvery === 0 ? (
+            <mesh key={`q${i}`} position={[w / 2 - 0.06, (i / steps) * h + railH / 2, -d / 2 + (i / steps) * d]} castShadow>
+              <boxGeometry args={[0.05, railH, 0.05]} />
+              <meshStandardMaterial color="#8a9aaa" metalness={0.7} roughness={0.3} />
+            </mesh>
+          ) : null)}
         </group>
       )
       break
@@ -200,11 +226,9 @@ function Level({ spec, yOffset }) {
       {spec.objects.map((o) => (
         <PlacedObject key={o.id} o={o} floorY={yOffset} accent={accent} marble={tex.marble} />
       ))}
-      {/* a bright fill over the centre of each floor so the dark walls read */}
-      <pointLight position={[spec.bounds.cx * S, yOffset + spec.height * HS * 0.85, spec.bounds.cz * S]} intensity={6} distance={spec.bounds.halfMax * S * 2.6} decay={1.4} color="#fff3e0" />
-      {/* the level's own cinematic fixtures */}
+      {/* cinematic spotlight fixtures */}
       {spec.lights.map((l, i) => (
-        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 1.1} distance={(l.range || 4) * S} decay={2} color={l.color || '#ffe1b0'} />
+        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 2.2} distance={(l.range || 4) * S} decay={2.2} color={l.color || '#ffe1b0'} />
       ))}
       <Text position={[spec.bounds.cx * S, ceilY - 0.4, spec.bounds.minZ * S + 0.6]} fontSize={0.6} color={accent} anchorX="center" anchorY="middle" letterSpacing={0.06}>
         {spec.name}
@@ -225,10 +249,8 @@ export default function MuseumMap() {
 
   return (
     <group>
-      <ambientLight intensity={1.15} />
-      <hemisphereLight args={['#fff6e6', '#4a4550', 1.0]} />
-      <directionalLight position={[6, 18, 8]} intensity={0.9} castShadow />
-      <directionalLight position={[-8, 16, -6]} intensity={0.5} />
+      <ambientLight intensity={0.18} color="#ffe8d0" />
+      <directionalLight position={[4, 20, 6]} intensity={0.25} castShadow />
       {l1 && <Level spec={l1} yOffset={0} />}
       {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
     </group>
