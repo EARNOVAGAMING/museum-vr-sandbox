@@ -61,7 +61,10 @@ function PlacedObject({ o, floorY, accent, marble }) {
   const r = (o.rotationY || 0) * Math.PI / 180
   const { w = 1, h = 1, d = 0.4 } = o.resolved || {}
   const wallMount = ['wall_frame', 'led_panel', 'video_wall', 'merch_shelf'].includes(o.type)
-  const baseY = wallMount ? floorY + (o.position.y || 1.5) * HS : floorY
+  // Floor objects sit on the floor PLUS their own base elevation (stair flights
+  // and the reception/landing platforms are raised — y = 0.4 / 1.5 etc.), so a
+  // multi-flight staircase stacks into one rising run instead of piling up.
+  const baseY = floorY + (o.position.y || (wallMount ? 1.5 : 0)) * HS
   const col = o.color || accent || '#caa64a'
 
   let body = null
