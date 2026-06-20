@@ -78,8 +78,18 @@ function PlacedObject({ o, floorY, accent, marble }) {
       )
       break
     case 'led_panel':
+      body = <mesh castShadow><boxGeometry args={[w, h, 0.12]} /><meshStandardMaterial color="#0b1822" emissive={col} emissiveIntensity={1.1} roughness={0.4} /></mesh>
+      break
     case 'video_wall':
-      body = <mesh castShadow><boxGeometry args={[w, h, 0.12]} /><meshStandardMaterial color="#0b1822" emissive={col} emissiveIntensity={0.9} roughness={0.4} /></mesh>
+      body = (
+        <group>
+          <mesh castShadow><boxGeometry args={[w, h, 0.1]} /><meshStandardMaterial color="#0a0a0a" roughness={0.4} /></mesh>
+          {/* warm layered mural colours — orange base, red-brown mid, gold highlight */}
+          <mesh position={[0, 0, 0.06]}><planeGeometry args={[w, h]} /><meshStandardMaterial color="#c85a18" emissive="#c85a18" emissiveIntensity={0.7} roughness={0.8} /></mesh>
+          <mesh position={[-w * 0.18, h * 0.1, 0.07]}><planeGeometry args={[w * 0.55, h * 0.7]} /><meshStandardMaterial color="#8b2a0a" emissive="#8b2a0a" emissiveIntensity={0.5} roughness={0.9} transparent opacity={0.7} /></mesh>
+          <mesh position={[w * 0.1, -h * 0.15, 0.07]}><planeGeometry args={[w * 0.5, h * 0.45]} /><meshStandardMaterial color="#e8c060" emissive="#e8c060" emissiveIntensity={0.6} roughness={0.8} transparent opacity={0.55} /></mesh>
+        </group>
+      )
       break
     case 'vitrine':
       body = (
@@ -93,8 +103,12 @@ function PlacedObject({ o, floorY, accent, marble }) {
     case 'plinth':
       body = (
         <group>
-          <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#e8e3d6" roughness={0.5} map={marble || null} /></mesh>
-          <mesh position={[0, h + 0.18, 0]} castShadow><torusKnotGeometry args={[0.14, 0.05, 90, 12]} /><meshStandardMaterial color={col} metalness={0.6} roughness={0.25} /></mesh>
+          <mesh position={[0, h / 2, 0]} castShadow><boxGeometry args={[w, h, d]} /><meshStandardMaterial color="#d8d4cc" roughness={0.45} map={marble || null} /></mesh>
+          {/* glowing pyramid / triangle on top */}
+          <mesh position={[0, h + Math.min(w, d) * 0.38, 0]} castShadow rotation={[0, Math.PI / 4, 0]}>
+            <coneGeometry args={[Math.min(w, d) * 0.38, Math.min(w, d) * 0.76, 4, 1]} />
+            <meshStandardMaterial color={col} emissive={col} emissiveIntensity={1.6} roughness={0.2} metalness={0.1} />
+          </mesh>
         </group>
       )
       break
@@ -249,8 +263,8 @@ export default function MuseumMap() {
 
   return (
     <group>
-      <ambientLight intensity={0.18} color="#ffe8d0" />
-      <directionalLight position={[4, 20, 6]} intensity={0.25} castShadow />
+      <ambientLight intensity={0.32} color="#ffe8d0" />
+      <directionalLight position={[4, 20, 6]} intensity={0.2} castShadow />
       {l1 && <Level spec={l1} yOffset={0} />}
       {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
     </group>
