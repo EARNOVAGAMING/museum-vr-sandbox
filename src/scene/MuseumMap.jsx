@@ -179,9 +179,11 @@ function Level({ spec, yOffset }) {
       {spec.objects.map((o) => (
         <PlacedObject key={o.id} o={o} floorY={yOffset} accent={accent} />
       ))}
-      {/* soft fill + the level's own cinematic lights */}
+      {/* a bright fill over the centre of each floor so the dark walls read */}
+      <pointLight position={[spec.bounds.cx * S, yOffset + spec.height * HS * 0.85, spec.bounds.cz * S]} intensity={6} distance={spec.bounds.halfMax * S * 2.6} decay={1.4} color="#fff3e0" />
+      {/* the level's own cinematic fixtures */}
       {spec.lights.map((l, i) => (
-        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 0.6} distance={(l.range || 4) * S} decay={2} color={l.color || '#ffe1b0'} />
+        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 1.1} distance={(l.range || 4) * S} decay={2} color={l.color || '#ffe1b0'} />
       ))}
       <Text position={[spec.bounds.cx * S, ceilY - 0.4, spec.bounds.minZ * S + 0.6]} fontSize={0.6} color={accent} anchorX="center" anchorY="middle" letterSpacing={0.06}>
         {spec.name}
@@ -202,9 +204,10 @@ export default function MuseumMap() {
 
   return (
     <group>
-      <ambientLight intensity={0.4} />
-      <hemisphereLight args={['#fff4e0', '#2a2630', 0.5]} />
-      <directionalLight position={[6, 14, 6]} intensity={0.5} castShadow />
+      <ambientLight intensity={1.15} />
+      <hemisphereLight args={['#fff6e6', '#4a4550', 1.0]} />
+      <directionalLight position={[6, 18, 8]} intensity={0.9} castShadow />
+      <directionalLight position={[-8, 16, -6]} intensity={0.5} />
       {l1 && <Level spec={l1} yOffset={0} />}
       {l2 && <Level spec={l2} yOffset={l2Offset} />}
     </group>
