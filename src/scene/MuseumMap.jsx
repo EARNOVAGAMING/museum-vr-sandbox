@@ -210,13 +210,14 @@ function Level({ spec, yOffset }) {
   )
 }
 
+export const floorOffset = (l1) => (l1 ? l1.height * HS + FLOOR_GAP : 0)
+
 export default function MuseumMap() {
-  // First floor only for now — Aidil's full Level 01 (entrance, reception,
-  // staircase, all placed objects). Second floor is parked until L1 is dialled in.
-  const l1 = useMemo(() => {
+  // Levels 1 + 2 — stacked vertically; you climb the staircase to reach L2.
+  const [l1, l2] = useMemo(() => {
     const map = createAomMuseumMap()
-    const lvl = (map.levels || [])[0]
-    return lvl ? buildLevelSpec(lvl) : null
+    const lv = (map.levels || []).slice(0, 2)
+    return lv.map((lvl) => buildLevelSpec(lvl))
   }, [])
 
   return (
@@ -226,6 +227,7 @@ export default function MuseumMap() {
       <directionalLight position={[6, 18, 8]} intensity={0.9} castShadow />
       <directionalLight position={[-8, 16, -6]} intensity={0.5} />
       {l1 && <Level spec={l1} yOffset={0} />}
+      {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
     </group>
   )
 }
