@@ -7,6 +7,9 @@ import { defineConfig } from 'vite'
 // (e.g. cloudflared / ngrok), or add a local cert. See README.
 export default defineConfig({
   plugins: [react()],
+  // Served from a GitHub Pages project site at /museum-vr-sandbox/, so assets
+  // must resolve under that base. (Harmless for local dev.)
+  base: '/museum-vr-sandbox/',
   server: {
     host: true,
   },
