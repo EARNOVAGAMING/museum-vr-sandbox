@@ -37,9 +37,9 @@ const POST_W = 2.2
 const POST_H = 3.4
 const POST_BOTTOM = 0.5
 
-// ── Map kiosk bottom-left of stairs ─────────────────────────────────────────
-const KIOSK_X = STAIR_X - STEP_W / 2 - 0.5   // just left of lower flight
-const KIOSK_Z = LOWER_BASE_Z - 0.5
+// ── Map kiosk at the foot of the stairs (just left of flight 1) ──────────────
+const KIOSK_X = STAIR_ORIGIN[0] - STEP_W / 2 - 0.5
+const KIOSK_Z = STAIR_ORIGIN[1] + 0.4
 
 // ── Canvas textures ──────────────────────────────────────────────────────────
 function makeWelcomeTex() {
