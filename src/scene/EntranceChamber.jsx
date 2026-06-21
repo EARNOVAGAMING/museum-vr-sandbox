@@ -330,10 +330,10 @@ export default function EntranceChamber({ yOffset = 0 }) {
     // Load real banner image; falls back to canvas automatically if file missing
     const bannerCanvas = makeBannerCanvas()
     const banner = new THREE.TextureLoader().load(
-      '/museum-vr-sandbox/textures/welcome-banner.png',
-      (t) => { bannerCanvas.dispose(); Object.assign(bannerCanvas, t); bannerCanvas.needsUpdate = true },
+      'https://raw.githubusercontent.com/EARNOVAGAMING/museum-vr-sandbox/main/Banner%20first%20level.jpg',
+      (t) => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; bannerCanvas.dispose(); Object.assign(bannerCanvas, t); bannerCanvas.needsUpdate = true },
       undefined,
-      () => { /* 404 — canvas stays */ }
+      () => { /* network error — canvas stays */ }
     )
     // Start with canvas; TextureLoader replaces it in-place when image loads
     const bannerTex = bannerCanvas
