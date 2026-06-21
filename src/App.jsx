@@ -13,8 +13,8 @@ const store = createXRStore()
 const S = LAYOUT_SCALE
 const HS = HEIGHT_SCALE
 
-// Level 01 world height (matches EntranceChamber RH constant)
-const L1_HEIGHT_WORLD = 4.5
+// Level 01 world height (matches EntranceChamber RH = 3.2m)
+const L1_HEIGHT_WORLD = 3.2
 const L1_GAP = 0.6
 
 export default function App() {
