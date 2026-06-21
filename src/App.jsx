@@ -77,7 +77,7 @@ export default function App() {
         )}
       </div>
 
-      <Canvas shadows camera={{ position: [18, 16, 44], fov: 60 }} gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 2.8 }}>
+      <Canvas shadows camera={{ position: [18, 16, 44], fov: 60 }} gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.8 }}>
         <color attach="background" args={['#2a2520']} />
         <XR store={store}>
           <MuseumMap />
