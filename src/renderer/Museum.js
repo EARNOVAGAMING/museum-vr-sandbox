@@ -9,9 +9,9 @@ const RW = 4.60, RD = 7.70, RH = 3.60, WT = 0.28
 const DW = 1.40, DH = 2.45
 const DOOR_CX = (RW / 2) - WT - DW / 2
 
-// Staircase — single straight flight, visual prop only (no collision)
-// Kept against left wall, climbing toward back wall (-Z)
-const SW = 1.26, SR = 0.22, SD = 0.36, NS = 10, SP_W = 0.17
+// Staircase — visual prop, single straight flight
+// Each step is a separate box at its own elevation so the profile reads clearly
+const SW = 1.20, SR = 0.18, SD = 0.28, NS = 10, SP_W = 0.17
 const STAIR_X1  = -(RW / 2) + WT           // left wall inner face
 const STAIR_X2  = STAIR_X1 + SW
 const STAIR_CX  = (STAIR_X1 + STAIR_X2) / 2
@@ -274,23 +274,25 @@ function buildEntranceChamber(g) {
   }
 
   // ── STAIRCASE — visual prop only, single straight flight ─────────────────
-  // Solid-fill steps climbing from STAIR_BASE_Z toward back wall (-Z)
+  // Each step is an individual box at its own elevation so the profile reads clearly
   for (let i = 0; i < NS; i++) {
-    const topY = (i + 1) * SR
-    const cz   = STAIR_BASE_Z - i * SD - SD / 2
-    g.add(box(SW, topY, SD, i % 2 === 0 ? mTread : mRiser, {
-      pos: [STAIR_CX, topY / 2, cz], cast: true, recv: true,
+    const stepY = i * SR + SR / 2           // box center at this step's elevation
+    const cz    = STAIR_BASE_Z - i * SD - SD / 2
+    g.add(box(SW, SR, SD, i % 2 === 0 ? mTread : mRiser, {
+      pos: [STAIR_CX, stepY, cz], cast: true, recv: true,
     }))
   }
-  // Side stringer (right side, closes the open face)
-  g.add(box(0.10, STAIR_TOP_Y, NS * SD, mRiser, {
-    pos: [STAIR_X2 + 0.05, STAIR_TOP_Y / 2, (STAIR_BASE_Z + STAIR_TOP_Z) / 2],
+  // Side stringer (right open face) — slope-aligned slab
+  const stairAngle = Math.atan2(NS * SR, NS * SD)
+  const stringLen  = Math.hypot(NS * SD, NS * SR) + 0.10
+  g.add(box(0.06, 0.28, stringLen, mRiser, {
+    pos: [STAIR_X2 + 0.03, STAIR_TOP_Y / 2, (STAIR_BASE_Z + STAIR_TOP_Z) / 2],
+    rot: [stairAngle, 0, 0],
   }))
-  // Handrail — wall side, slope-aligned, precisely 0.9 m above step noses
-  const stairAngle = Math.atan2(SR, SD)
-  const railLen    = Math.hypot(NS * SD, NS * SR) + 0.30
-  const railY      = STAIR_TOP_Y / 2 + 0.90
-  g.add(box(0.08, 0.08, railLen, mRail, {
+  // Handrail — ~0.9 m above step noses, slope-aligned
+  const railLen = stringLen + 0.20
+  const railY   = SR * (NS + 1) / 2 + 0.90  // midpoint step-nose height + 0.9
+  g.add(box(0.06, 0.06, railLen, mRail, {
     pos: [STAIR_X1 + 0.08, railY, (STAIR_BASE_Z + STAIR_TOP_Z) / 2],
     rot: [stairAngle, 0, 0], cast: true,
   }))
