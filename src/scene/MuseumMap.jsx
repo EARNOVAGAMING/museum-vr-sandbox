@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { Text } from '@react-three/drei'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from '../data/museumMapModel'
 import { buildLevelSpec } from '../data/museumMapScene'
-import { woodTexture, plasterTexture, marbleTexture } from '../textures/procedural'
+import { woodTexture, plasterTexture, marbleTexture, rockTexture } from '../textures/procedural'
 
 // Clean R3F renderer for Aidil's real AOM floorplan data (museumMapModel.js).
 // We reuse his DATA (footprints, walls, zones, placed objects, stairs) and draw
@@ -161,41 +161,24 @@ function PlacedObject({ o, floorY, accent, marble }) {
       )
       break
     case 'stairs': {
-      const steps = 10
-      const railH = Math.min(h * 0.9, 1.0)
-      const postEvery = Math.max(1, Math.floor(steps / 4))
+      const steps = 5
+      const stepCol = o.color || '#5a5a5a'
       body = (
         <group>
-          {/* treads */}
           {Array.from({ length: steps }, (_, i) => (
             <mesh key={i} position={[0, (i + 0.5) * (h / steps), -d / 2 + (i + 0.5) * (d / steps)]} castShadow receiveShadow>
-              <boxGeometry args={[w, h / steps * 0.72, d / steps]} />
-              <meshStandardMaterial color="#5a3c24" roughness={0.65} />
+              <boxGeometry args={[w, h / steps * 0.85, d / steps]} />
+              <meshStandardMaterial color={stepCol} roughness={0.88} metalness={0.04} />
             </mesh>
           ))}
-          {/* left handrail bar */}
-          <mesh position={[-w / 2 + 0.06, h / 2 + railH, 0]} rotation={[Math.atan2(h, d), 0, 0]} castShadow>
-            <boxGeometry args={[0.06, 0.06, Math.hypot(h, d) + 0.1]} />
-            <meshStandardMaterial color="#8a9aaa" metalness={0.75} roughness={0.25} />
-          </mesh>
-          {/* right handrail bar */}
-          <mesh position={[w / 2 - 0.06, h / 2 + railH, 0]} rotation={[Math.atan2(h, d), 0, 0]} castShadow>
-            <boxGeometry args={[0.06, 0.06, Math.hypot(h, d) + 0.1]} />
-            <meshStandardMaterial color="#8a9aaa" metalness={0.75} roughness={0.25} />
-          </mesh>
-          {/* vertical balusters */}
-          {Array.from({ length: steps }, (_, i) => i % postEvery === 0 ? (
-            <mesh key={`p${i}`} position={[-w / 2 + 0.06, (i / steps) * h + railH / 2, -d / 2 + (i / steps) * d]} castShadow>
-              <boxGeometry args={[0.05, railH, 0.05]} />
-              <meshStandardMaterial color="#8a9aaa" metalness={0.7} roughness={0.3} />
-            </mesh>
-          ) : null)}
-          {Array.from({ length: steps }, (_, i) => i % postEvery === 0 ? (
-            <mesh key={`q${i}`} position={[w / 2 - 0.06, (i / steps) * h + railH / 2, -d / 2 + (i / steps) * d]} castShadow>
-              <boxGeometry args={[0.05, railH, 0.05]} />
-              <meshStandardMaterial color="#8a9aaa" metalness={0.7} roughness={0.3} />
-            </mesh>
-          ) : null)}
+          {[-1, 1].map((side) => (
+            <group key={side}>
+              <mesh position={[side * (w / 2 - 0.06), h / 2 + 0.52, 0]} rotation={[Math.atan2(h, d), 0, 0]} castShadow>
+                <boxGeometry args={[0.05, 0.05, Math.hypot(h, d) + 0.15]} />
+                <meshStandardMaterial color="#8a9aaa" metalness={0.8} roughness={0.2} />
+              </mesh>
+            </group>
+          ))}
         </group>
       )
       break
@@ -216,17 +199,17 @@ function Level({ spec, yOffset }) {
   const accent = spec.mood?.accent || '#e7c789'
   const ceilY = yOffset + spec.height * HS
   const tex = useMemo(() => {
-    const wood = woodTexture(); wood.repeat.set(0.5, 0.5)
-    const plaster = plasterTexture(spec.wallColor); plaster.repeat.set(3, 1.5)
+    const wood = woodTexture(); wood.repeat.set(0.4, 0.4)
+    const rock = rockTexture(); rock.repeat.set(2.5, 1.5)
     const marble = marbleTexture()
-    return { wood, plaster, marble }
+    return { wood, rock, marble }
   }, [spec.wallColor])
   return (
     <group>
-      <Slab points={spec.footprint} color={spec.floorColor} roughness={spec.floorRoughness ?? 0.55} y={yOffset} map={tex.wood} />
-      <Slab points={spec.footprint} color={spec.wallColor} roughness={1} y={ceilY} map={tex.plaster} />
+      <Slab points={spec.footprint} color={spec.floorColor} roughness={spec.floorRoughness ?? 0.60} y={yOffset} map={tex.wood} />
+      <Slab points={spec.footprint} color="#1e1a16" roughness={0.98} y={ceilY} map={tex.rock} />
       {spec.wallSegments.map((seg, i) => (
-        <WallSeg key={i} a={seg.a} b={seg.b} height={seg.height || spec.height} color={spec.wallColor} roughness={spec.wallRoughness ?? 0.75} y={yOffset} map={tex.plaster} />
+        <WallSeg key={i} a={seg.a} b={seg.b} height={seg.height || spec.height} color="#252018" roughness={spec.wallRoughness ?? 0.97} y={yOffset} map={tex.rock} />
       ))}
       {/* zone "area" pools — subtle tinted floor patches at each labelled zone */}
       {spec.zones.map((z, i) => (
@@ -242,7 +225,7 @@ function Level({ spec, yOffset }) {
       ))}
       {/* cinematic spotlight fixtures */}
       {spec.lights.map((l, i) => (
-        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 3.8} distance={(l.range || 4) * S * 1.5} decay={1.8} color={l.color || '#ffe1b0'} />
+        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 4.5} distance={(l.range || 4) * S * 1.6} decay={1.6} color={l.color || '#ffe1b0'} />
       ))}
       <Text position={[spec.bounds.cx * S, ceilY - 0.4, spec.bounds.minZ * S + 0.6]} fontSize={0.6} color={accent} anchorX="center" anchorY="middle" letterSpacing={0.06}>
         {spec.name}
@@ -263,9 +246,8 @@ export default function MuseumMap() {
 
   return (
     <group>
-      <ambientLight intensity={0.85} color="#ffe8d0" />
-      <directionalLight position={[4, 20, 6]} intensity={1.2} castShadow />
-      <directionalLight position={[-6, 14, -4]} intensity={0.6} />
+      <ambientLight intensity={0.15} color="#ffe8d0" />
+      <directionalLight position={[4, 20, 6]} intensity={0.3} castShadow />
       {l1 && <Level spec={l1} yOffset={0} />}
       {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
     </group>

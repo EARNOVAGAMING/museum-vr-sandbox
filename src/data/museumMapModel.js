@@ -143,16 +143,19 @@ function wall(ax, az, bx, bz, openings = [], height = null) {
 }
 
 // ---------------------------------------------------------------------------
-// LEVEL 01 — ENTRANCE. Simple rectangular hall: warm wood floor, dark rough
-// walls, straight staircase on the left, large illuminated welcome mural on
-// the back-centre wall, glowing pyramid plinth left of centre.
+// LEVEL 01 — ENTRANCE CHAMBER. Spec: ~8m wide × 6m deep × 4m high.
+// Dark cave/rock walls, warm wood floor, one recessed ceiling spot over the
+// AOM welcome poster (back-right), concrete stairs on the left rising to a
+// raised landing with a glowing pyramid plinth. Very cinematic/dark mood.
+// Pre-scale metres — scaleLevel(×2.7 XZ, ×1.8 H) brings to world size.
 // ---------------------------------------------------------------------------
 function buildLevel01() {
-  const W = 4.2;   // room width
-  const D = 4.0;   // room depth
-  const H = 3.0;   // ceiling height
-  const hx = W / 2;  // 2.1
-  const hz = D / 2;  // 2.0
+  // Blueprint coordinates (pre-scale). Post-scale: ~8.1m W, ~5.4m D, ~4.3m H.
+  const W = 3.0;
+  const D = 2.0;
+  const H = 2.4;
+  const hx = W / 2;   // 1.5
+  const hz = D / 2;   // 1.0
 
   const footprint = [
     { x: -hx, z: -hz },
@@ -161,59 +164,82 @@ function buildLevel01() {
     { x: -hx, z:  hz },
   ];
 
-  // Entrance opening right-of-centre on the front wall.
+  // Front wall has a doorway opening (player enters). Opening centred at x=0.
   const walls = [
-    wall(-hx, -hz,  hx, -hz),                                // back wall
-    wall( hx, -hz,  hx,  hz),                                // right wall
-    wall( hx,  hz, -hx,  hz, [{ at: 0.62, width: 1.1 }]),   // front wall + entrance
-    wall(-hx,  hz, -hx, -hz),                                // left wall
+    wall(-hx, -hz,  hx, -hz),                               // back wall (rock)
+    wall( hx, -hz,  hx,  hz),                               // right wall (rock)
+    wall( hx,  hz, -hx,  hz, [{ at: 0.5, width: 1.1 }]),   // front wall + doorway
+    wall(-hx,  hz, -hx, -hz),                               // left wall (rock)
   ];
 
   const zones = [
-    { id: "l1_entrance", name: "Entrance", tint: "#e7c789", center: { x: 0.6, z: 0.8 } },
-    { id: "l1_stair",   name: "Staircase", tint: "#8fb2ff", center: { x: -1.6, z: 0.0 } },
+    { id: "l1_chamber", name: "Entrance Chamber", tint: "#e7c789", center: { x: 0.4, z: 0.0 } },
+    { id: "l1_stair",   name: "Staircase",         tint: "#8fb2ff", center: { x: -1.1, z: -0.3 } },
   ];
 
-  const STAIR_H = 1.5;   // total rise of the staircase flight
-  const STAIR_D = 2.6;   // run (depth) of the flight
+  // Staircase: 4-5 grey concrete steps on left side, rising to a landing.
+  // Platform = the raised landing at the top of the stairs.
+  const STAIR_H = 0.7;   // total rise (pre-scale → ×1.8 = ~1.26m)
+  const STAIR_D = 1.4;   // run depth  (pre-scale → ×2.7 = ~3.78m)
+  const STAIR_W = 0.85;  // width      (pre-scale → ×2.7 = ~2.3m)
+  const LAND_H  = STAIR_H;  // landing sits at same height as stair top
+
+  // Pyramid plinth sits on the landing, tucked against the left wall.
+  const PLINTH_X = -hx + 0.28;
+  const PLINTH_Z = -0.55;
 
   const objects = [
-    // Large welcome mural — back wall, centre-right, tall and prominent.
-    obj("video_wall", 0.5, -hz + 0.1, {
-      y: 0.1, rotationY: 0,
+    // ── WELCOME POSTER ──────────────────────────────────────────────────────
+    // Back-right wall, tall vertical panel (2m × 3.5m at world scale).
+    // Pre-scale: w=0.74, h=1.94 (post: ×OBJECT_SIZE_SCALE ≈ 1.44 × 3.78 — too
+    // large, so we pin an explicit size that hits ~2m×3.5m after ×2.7/×1.8).
+    obj("video_wall", 0.65, -hz + 0.1, {
+      y: 0.05, rotationY: 0,
       title: "Welcome to Asian Operatic Museum",
-      zone: "l1_entrance",
-      color: "#c8702a",
-      size: { w: 1.9, h: 2.6 },
+      zone: "l1_chamber",
+      color: "#d4781e",
+      size: { w: 0.74, h: 1.94 },   // world: ~2.0m × 3.5m
     }),
-    // Glowing pyramid plinth — left of centre, facing the entrance.
-    obj("plinth", -0.9, 0.4, {
-      title: "Illuminated Pyramid",
-      zone: "l1_entrance",
-      color: "#ffcc44",
-      size: { w: 0.42, h: 0.75, d: 0.42 },
-    }),
-    // Straight staircase on the left wall, rising toward the back.
-    obj("stairs", -hx + 0.55, -0.1, {
+
+    // ── STAIRCASE ────────────────────────────────────────────────────────────
+    // Left side, 4-5 concrete steps, grey, collision-enabled via solid mesh.
+    obj("stairs", -hx + STAIR_W / 2, -0.15, {
       y: 0, rotationY: 0,
       title: "Staircase to Level 02",
       zone: "l1_stair",
       linkLevelId: "level_02",
-      size: { w: 1.0, h: STAIR_H, d: STAIR_D },
+      color: "#5a5a5a",
+      size: { w: STAIR_W, h: STAIR_H, d: STAIR_D },
+    }),
+
+    // Raised landing platform at the top of the stairs.
+    obj("platform", -hx + STAIR_W / 2, -hz + 0.35, {
+      title: "Stair Landing",
+      zone: "l1_stair",
+      color: "#4a4a4a",
+      size: { w: STAIR_W, h: LAND_H, d: 0.7 },
+    }),
+
+    // ── PYRAMID PLINTH ───────────────────────────────────────────────────────
+    // Dark rectangular plinth on the landing, glowing golden pyramid on top.
+    obj("plinth", PLINTH_X, PLINTH_Z, {
+      y: LAND_H,
+      title: "Golden Pyramid",
+      zone: "l1_stair",
+      color: "#ffd060",
+      size: { w: 0.19, h: 0.44, d: 0.19 },   // world: ~0.5m × 0.8m × 0.5m
     }),
   ];
 
   const lights = [
-    // Recessed ceiling spot directly over the mural — bright, focused.
-    { x: 0.5,  y: H - 0.1, z: -hz + 1.1, color: "#fff8ee", intensity: 14, range: 4.0 },
-    // Warm floor glow washing up the mural from below.
-    { x: 0.5,  y: 0.2,     z: -hz + 0.5, color: "#ffaa44", intensity:  6, range: 2.8 },
-    // Soft fill over the stair area so the steps are readable.
-    { x: -hx + 0.6, y: H - 0.3, z: 0.0, color: "#ffe0a0", intensity:  7, range: 4.5 },
-    // Entrance pool — warm welcome light as you walk in.
-    { x: 0.6,  y: H - 0.4, z: hz - 0.6,  color: "#ffd9a8", intensity:  6, range: 3.5 },
-    // Pyramid glow — small warm point from the plinth object.
-    { x: -0.9, y: 1.1,     z: 0.4,        color: "#ffdd55", intensity:  4, range: 2.5 },
+    // Recessed ceiling spotlight focused on the welcome poster.
+    { x: 0.65, y: H - 0.08, z: -hz + 0.9, color: "#fff5e8", intensity: 16, range: 3.8 },
+    // Subtle uplight from the floor in front of the poster.
+    { x: 0.65, y: 0.15,     z: -hz + 0.55, color: "#ffaa55", intensity:  5, range: 2.2 },
+    // Pyramid point light — warm golden glow emanating from the plinth.
+    { x: PLINTH_X, y: LAND_H + 0.55, z: PLINTH_Z, color: "#ffd060", intensity: 5, range: 3.0 },
+    // Very faint fill over the stair tread so steps are readable.
+    { x: -hx + 0.5, y: H - 0.3, z: 0.0, color: "#ffe0b0", intensity: 3, range: 3.5 },
   ];
 
   return {
@@ -224,12 +250,12 @@ function buildLevel01() {
     footprint,
     height: H,
     ridgeHeight: null,
-    wallStyle: "dark_museum_wall",
+    wallStyle: "dark_museum_wall",   // renderer will override with rock texture
     floorStyle: "warm_wood_floor",
-    wallRoughness: 0.95,
-    floorRoughness: 0.35,
-    mood: { ambient: 0.32, accent: "#ffcc44", background: "#0a0807" },
-    spawn: { x: 0.6, z: hz - 0.4, rotationY: 180 },
+    wallRoughness: 0.97,
+    floorRoughness: 0.60,
+    mood: { ambient: 0.15, accent: "#ffd060", background: "#060504" },
+    spawn: { x: 0.0, z: hz - 0.35, rotationY: 180 },
     walls,
     zones,
     objects,

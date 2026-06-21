@@ -56,6 +56,41 @@ export function plasterTexture(base = '#262229') {
   })
 }
 
+// Dark rough rock/cave stone — grey-brown with cracks and variation.
+export function rockTexture() {
+  return make(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#2a2520'
+    ctx.fillRect(0, 0, w, h)
+    // large stone blocks
+    for (let bx = 0; bx < 4; bx++) {
+      for (let by = 0; by < 4; by++) {
+        const bw = w / 4, bh = h / 4
+        const shade = rnd(-14, 14)
+        ctx.fillStyle = `rgb(${42 + shade},${37 + shade * 0.8},${32 + shade * 0.6})`
+        ctx.fillRect(bx * bw + 1, by * bh + 1, bw - 2, bh - 2)
+      }
+    }
+    // crack / grain noise
+    for (let i = 0; i < 1800; i++) {
+      const a = rnd(0, 0.12)
+      ctx.fillStyle = `rgba(0,0,0,${a})`
+      ctx.fillRect(rnd(0, w), rnd(0, h), rnd(1, 3), rnd(1, 3))
+    }
+    // light speckles (mineral glint)
+    for (let i = 0; i < 300; i++) {
+      ctx.fillStyle = `rgba(200,190,170,${rnd(0.04, 0.12)})`
+      ctx.fillRect(rnd(0, w), rnd(0, h), 1, 1)
+    }
+    // mortar lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+    ctx.lineWidth = 2
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(i * w / 4, 0); ctx.lineTo(i * w / 4, h); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0, i * h / 4); ctx.lineTo(w, i * h / 4); ctx.stroke()
+    }
+  })
+}
+
 // Light marble with grey veins.
 export function marbleTexture() {
   return make(256, 256, (ctx, w, h) => {
