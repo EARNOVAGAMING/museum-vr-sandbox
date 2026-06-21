@@ -1,97 +1,73 @@
-import { useMemo, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import { createXRStore, XR } from '@react-three/xr'
-import MuseumMap from './scene/MuseumMap.jsx'
-import FirstPersonRig from './scene/FirstPersonRig.jsx'
+import { useEffect, useRef, useState } from 'react'
+import { SceneManager } from './renderer/SceneManager.js'
 import Joystick from './ui/Joystick.jsx'
-import { getEntranceChamberFloorData } from './scene/EntranceChamber.jsx'
-import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from './data/museumMapModel'
-import { buildLevelSpec } from './data/museumMapScene'
-
-const store = createXRStore()
-const S = LAYOUT_SCALE
-const HS = HEIGHT_SCALE
-
-// Level 01 world height (matches EntranceChamber RH = 3.0m)
-const L1_HEIGHT_WORLD = 3.0
-const L1_GAP = 0.6
 
 export default function App() {
-  const [mode, setMode] = useState('walk')
+  const canvasRef = useRef(null)
+  const smRef     = useRef(null)
+  const [mode, setMode]         = useState('walk')
   const [reqFloor, setReqFloor] = useState(0)
-  const [nonce, setNonce] = useState(0)
+  const [floors, setFloors]     = useState([])
 
-  const { floors, triggers } = useMemo(() => {
-    // Floor 0 — hand-crafted entrance chamber
-    const f0 = getEntranceChamberFloorData(0)
-
-    // Floor 1 — Level 02 from data model
-    const map = createAomMuseumMap()
-    const lv2raw = (map.levels || [])[1]
-    const l2Y = L1_HEIGHT_WORLD + L1_GAP
-    let f1 = null
-    if (lv2raw) {
-      const spec = buildLevelSpec(lv2raw)
-      const sp = spec.spawn || { x: 0, z: 0 }
-      const cx = spec.bounds?.cx || 0
-      const cz = spec.bounds?.cz || 0
-      f1 = {
-        floorY: l2Y,
-        footprint: spec.footprint,
-        walls: spec.wallSegments,
-        spawn: [sp.x * S, sp.z * S],
-        short: 'L2',
-        centerW: [cx * S, cz * S],
-      }
-    }
-
-    const floors = f1 ? [f0, f1] : [f0]
-    // No stair triggers needed yet (manual L1/L2 buttons handle jumping)
-    return { floors, triggers: [] }
+  // Boot Three.js scene once the canvas element is in the DOM
+  useEffect(() => {
+    const sm = new SceneManager(canvasRef.current)
+    smRef.current = sm
+    setFloors(sm.getFloors())
+    return () => sm.dispose()
   }, [])
 
-  const jump = (i) => { setReqFloor(i); setNonce((n) => n + 1) }
+  const switchMode = (m) => {
+    setMode(m)
+    smRef.current?.setMode(m)
+  }
+
+  const jump = (i) => {
+    setReqFloor(i)
+    smRef.current?.jumpToFloor(i)
+  }
 
   return (
     <>
+      {/* Full-screen Three.js canvas */}
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', display: 'block' }}
+      />
+
+      {/* HUD hint */}
       <div className="hint">
         <strong>Asian Operatic Museum — 3D Twin</strong>
         <br />
         {mode === 'walk'
-          ? 'Drag to look · joystick / WASD to walk · climb the staircase to Level 02.'
-          : 'Drag to orbit · pinch / scroll to zoom.'}
+          ? 'Drag to look · joystick / WASD to walk'
+          : 'Drag to orbit · scroll to zoom'}
       </div>
 
+      {/* Mode + floor buttons */}
       <div className="ui-buttons">
         <div className="ui-row">
-          <button className={`ui-btn ${mode === 'walk' ? 'active' : ''}`} onClick={() => setMode('walk')}>Walk</button>
-          <button className={`ui-btn ${mode === 'overview' ? 'active' : ''}`} onClick={() => setMode('overview')}>Overview</button>
+          <button className={`ui-btn ${mode === 'walk'     ? 'active' : ''}`} onClick={() => switchMode('walk')}>Walk</button>
+          <button className={`ui-btn ${mode === 'overview' ? 'active' : ''}`} onClick={() => switchMode('overview')}>Overview</button>
         </div>
         {mode === 'walk' && (
           <div className="ui-row">
             {floors.map((f, i) => (
-              <button key={i} className={`ui-btn ${reqFloor === i ? 'active' : ''}`} onClick={() => jump(i)}>{f.short}</button>
+              <button key={i} className={`ui-btn ${reqFloor === i ? 'active' : ''}`} onClick={() => jump(i)}>
+                {f.short}
+              </button>
             ))}
           </div>
         )}
       </div>
 
-      <Canvas shadows camera={{ position: [18, 16, 44], fov: 60 }} gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.8 }}>
-        <color attach="background" args={['#2a2520']} />
-        <XR store={store}>
-          <MuseumMap />
-          {mode === 'walk' ? (
-            <FirstPersonRig floors={floors} triggers={triggers} requestFloor={reqFloor} requestNonce={nonce} />
-          ) : (
-            <OrbitControls target={[0, 5, 0]} maxPolarAngle={Math.PI / 2.02} minDistance={4} maxDistance={70} enablePan enableDamping dampingFactor={0.08} />
-          )}
-        </XR>
-      </Canvas>
-
+      {/* On-screen joystick (walk mode only) */}
       {mode === 'walk' && <Joystick />}
 
-      <button className="vr-button" onClick={() => store.enterVR()}>Enter VR</button>
+      {/* Enter VR */}
+      <button className="vr-button" onClick={() => smRef.current?.enterVR()}>
+        Enter VR
+      </button>
     </>
   )
 }
