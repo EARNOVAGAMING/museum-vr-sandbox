@@ -5,13 +5,17 @@ import { createXRStore, XR } from '@react-three/xr'
 import MuseumMap from './scene/MuseumMap.jsx'
 import FirstPersonRig from './scene/FirstPersonRig.jsx'
 import Joystick from './ui/Joystick.jsx'
+import { getEntranceChamberFloorData } from './scene/EntranceChamber.jsx'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from './data/museumMapModel'
 import { buildLevelSpec } from './data/museumMapScene'
 
 const store = createXRStore()
 const S = LAYOUT_SCALE
 const HS = HEIGHT_SCALE
-const FLOOR_GAP = 0.6
+
+// Level 01 world height (matches EntranceChamber RH constant)
+const L1_HEIGHT_WORLD = 4.5
+const L1_GAP = 0.6
 
 export default function App() {
   const [mode, setMode] = useState('walk')
@@ -19,54 +23,32 @@ export default function App() {
   const [nonce, setNonce] = useState(0)
 
   const { floors, triggers } = useMemo(() => {
+    // Floor 0 — hand-crafted entrance chamber
+    const f0 = getEntranceChamberFloorData(0)
+
+    // Floor 1 — Level 02 from data model
     const map = createAomMuseumMap()
-    const specs = (map.levels || []).slice(0, 2).map(buildLevelSpec)
-    let y = 0
-    const floors = specs.map((spec, i) => {
+    const lv2raw = (map.levels || [])[1]
+    const l2Y = L1_HEIGHT_WORLD + L1_GAP
+    let f1 = null
+    if (lv2raw) {
+      const spec = buildLevelSpec(lv2raw)
       const sp = spec.spawn || { x: 0, z: 0 }
       const cx = spec.bounds?.cx || 0
       const cz = spec.bounds?.cz || 0
-      const info = {
-        floorY: y,
+      f1 = {
+        floorY: l2Y,
         footprint: spec.footprint,
         walls: spec.wallSegments,
         spawn: [sp.x * S, sp.z * S],
-        short: `L${i + 1}`,
+        short: 'L2',
         centerW: [cx * S, cz * S],
       }
-      y += (spec.height || 3) * HS + FLOOR_GAP
-      return info
-    })
-    // each floor's stair that links to the other floor (for the arrival point)
-    const linkPos = specs.map((spec) => {
-      const o = (spec.objects || []).find((x) => x.type === 'stairs' && x.linkLevelId)
-      return o ? [o.position.x * S, o.position.z * S] : null
-    })
-    const triggers = []
-    specs.forEach((spec, i) => {
-      (spec.objects || []).filter((o) => o.type === 'stairs' && o.linkLevelId).forEach((o) => {
-        const target = o.linkLevelId === 'level_02' ? 1 : o.linkLevelId === 'level_01' ? 0 : -1
-        if (target < 0 || target >= floors.length) return
-        const cx = o.position.x * S
-        const cz = o.position.z * S
-        const sz = o.resolved || { w: 2.4, d: 2.4 }
-        const box = {
-          minX: cx - (sz.w / 2 + 1.7), maxX: cx + (sz.w / 2 + 1.7),
-          minZ: cz - (sz.d / 2 + 1.7), maxZ: cz + (sz.d / 2 + 1.7),
-        }
-        const tf = floors[target]
-        const lp = linkPos[target]
-        let arrive = tf.centerW
-        if (lp) {
-          const dx = tf.centerW[0] - lp[0]
-          const dz = tf.centerW[1] - lp[1]
-          const dl = Math.hypot(dx, dz) || 1
-          arrive = [lp[0] + (dx / dl) * 2.8, lp[1] + (dz / dl) * 2.8]
-        }
-        triggers.push({ onFloor: i, toFloor: target, box, arrive })
-      })
-    })
-    return { floors, triggers }
+    }
+
+    const floors = f1 ? [f0, f1] : [f0]
+    // No stair triggers needed yet (manual L1/L2 buttons handle jumping)
+    return { floors, triggers: [] }
   }, [])
 
   const jump = (i) => { setReqFloor(i); setNonce((n) => n + 1) }

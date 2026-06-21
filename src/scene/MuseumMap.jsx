@@ -4,6 +4,7 @@ import { Text } from '@react-three/drei'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from '../data/museumMapModel'
 import { buildLevelSpec } from '../data/museumMapScene'
 import { woodTexture, plasterTexture, marbleTexture, rockTexture } from '../textures/procedural'
+import EntranceChamber, { getEntranceChamberFloorData } from './EntranceChamber'
 
 // Clean R3F renderer for Aidil's real AOM floorplan data (museumMapModel.js).
 // We reuse his DATA (footprints, walls, zones, placed objects, stairs) and draw
@@ -236,20 +237,29 @@ function Level({ spec, yOffset }) {
 
 export const floorOffset = (l1) => (l1 ? l1.height * HS + FLOOR_GAP : 0)
 
+// Level 01 uses the hand-crafted EntranceChamber instead of the generic Level.
+// Level 02 height in world metres — used to offset the second floor.
+const L1_HEIGHT_WORLD = 4.5
+const L1_GAP = 0.6
+
+export { getEntranceChamberFloorData }
+
 export default function MuseumMap() {
-  // Levels 1 + 2 — stacked vertically; you climb the staircase to reach L2.
-  const [l1, l2] = useMemo(() => {
+  const l2 = useMemo(() => {
     const map = createAomMuseumMap()
     const lv = (map.levels || []).slice(0, 2)
-    return lv.map((lvl) => buildLevelSpec(lvl))
+    return lv[1] ? buildLevelSpec(lv[1]) : null
   }, [])
+
+  const l2Y = L1_HEIGHT_WORLD + L1_GAP
 
   return (
     <group>
-      <ambientLight intensity={0.15} color="#ffe8d0" />
-      <directionalLight position={[4, 20, 6]} intensity={0.3} castShadow />
-      {l1 && <Level spec={l1} yOffset={0} />}
-      {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
+      {/* Level 01 — bespoke entrance chamber */}
+      <EntranceChamber yOffset={0} />
+      {/* Level 02 — generic renderer */}
+      <directionalLight position={[4, 20, 6]} intensity={0.25} castShadow />
+      {l2 && <Level spec={l2} yOffset={l2Y} />}
     </group>
   )
 }
