@@ -160,18 +160,20 @@ export default function EntranceChamber({ yOffset = 0 }) {
   return (
     <group>
       {/* ── LIGHTING ── */}
-      <ambientLight intensity={0.12} color="#ffddbb" />
+      <ambientLight intensity={1.8} color="#ffffff" />
+      <directionalLight position={[0, 10, 0]} intensity={1.5} color="#ffffff" />
+      <pointLight position={[0, RH - 0.5, 0]} intensity={20} distance={12} decay={1.2} color="#ffffff" />
 
       {/* spotlight on poster */}
       <spotLight
         ref={spotRef}
         position={[0, y + RH - 0.3, posterZ + 2.5]}
-        intensity={28}
-        angle={0.32}
-        penumbra={0.45}
-        distance={RH + 1}
-        decay={1.6}
-        color="#fff5e0"
+        intensity={40}
+        angle={0.45}
+        penumbra={0.4}
+        distance={RH + 2}
+        decay={1.2}
+        color="#ffffff"
         castShadow
         shadow-mapSize={[1024, 1024]}
       />
@@ -180,10 +182,10 @@ export default function EntranceChamber({ yOffset = 0 }) {
       {/* pyramid warm glow */}
       <pointLight
         position={[PLAT_X, pyrBaseY + pyrSize * 0.8, PLAT_Z]}
-        intensity={6}
-        distance={4.5}
-        decay={1.8}
-        color="#ffb84a"
+        intensity={12}
+        distance={6}
+        decay={1.2}
+        color="#ffcc66"
       />
 
       {/* ── FLOOR — wood planks ── */}
@@ -195,42 +197,42 @@ export default function EntranceChamber({ yOffset = 0 }) {
       {/* ── CEILING — rock ── */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, y + RH, 0]}>
         <planeGeometry args={[RW, RD]} />
-        <meshStandardMaterial color="#1c1814" roughness={0.98} map={tex.rock} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#6a6258" roughness={0.85} map={tex.rock} side={THREE.DoubleSide} />
       </mesh>
 
       {/* ── BACK WALL (Z-) ── */}
       <mesh position={[0, y + RH / 2, -(RD / 2) + WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[RW, RH, WT]} />
-        <meshStandardMaterial color="#252018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
 
       {/* ── LEFT WALL (X-) ── */}
       <mesh position={[-(RW / 2) + WT / 2, y + RH / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[WT, RH, RD]} />
-        <meshStandardMaterial color="#222018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
 
       {/* ── RIGHT WALL (X+) ── */}
       <mesh position={[(RW / 2) - WT / 2, y + RH / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[WT, RH, RD]} />
-        <meshStandardMaterial color="#222018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
 
       {/* ── FRONT WALL (Z+) — doorway opening: left column, right column, header ── */}
       {/* left column */}
       <mesh position={[-(DW / 2 + (RW / 2 - DW / 2) / 2), y + RH / 2, (RD / 2) - WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[RW / 2 - DW / 2, RH, WT]} />
-        <meshStandardMaterial color="#252018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
       {/* right column */}
       <mesh position={[(DW / 2 + (RW / 2 - DW / 2) / 2), y + RH / 2, (RD / 2) - WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[RW / 2 - DW / 2, RH, WT]} />
-        <meshStandardMaterial color="#252018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
       {/* header beam above doorway */}
       <mesh position={[0, y + DH + (RH - DH) / 2, (RD / 2) - WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[DW, RH - DH, WT]} />
-        <meshStandardMaterial color="#252018" roughness={0.97} map={tex.rock} />
+        <meshStandardMaterial color="#7a7060" roughness={0.85} map={tex.rock} />
       </mesh>
 
       {/* ── WELCOME POSTER ── */}
