@@ -242,7 +242,7 @@ function Level({ spec, yOffset }) {
       ))}
       {/* cinematic spotlight fixtures */}
       {spec.lights.map((l, i) => (
-        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 2.2} distance={(l.range || 4) * S} decay={2.2} color={l.color || '#ffe1b0'} />
+        <pointLight key={i} position={[l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]} intensity={(l.intensity || 4) * 3.8} distance={(l.range || 4) * S * 1.5} decay={1.8} color={l.color || '#ffe1b0'} />
       ))}
       <Text position={[spec.bounds.cx * S, ceilY - 0.4, spec.bounds.minZ * S + 0.6]} fontSize={0.6} color={accent} anchorX="center" anchorY="middle" letterSpacing={0.06}>
         {spec.name}
@@ -263,8 +263,9 @@ export default function MuseumMap() {
 
   return (
     <group>
-      <ambientLight intensity={0.32} color="#ffe8d0" />
-      <directionalLight position={[4, 20, 6]} intensity={0.2} castShadow />
+      <ambientLight intensity={0.85} color="#ffe8d0" />
+      <directionalLight position={[4, 20, 6]} intensity={1.2} castShadow />
+      <directionalLight position={[-6, 14, -4]} intensity={0.6} />
       {l1 && <Level spec={l1} yOffset={0} />}
       {l2 && <Level spec={l2} yOffset={floorOffset(l1)} />}
     </group>
