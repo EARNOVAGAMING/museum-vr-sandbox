@@ -1,109 +1,90 @@
 import { useMemo, useRef, useEffect } from 'react'
 import * as THREE from 'three'
-import { woodTexture, plasterTexture } from '../textures/procedural'
-import { LAYOUT_SCALE } from '../data/museumMapModel'
+import { woodTexture } from '../textures/procedural'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ROOM SHAPE — matches architect floorplan: narrow portrait room
-// ─────────────────────────────────────────────────────────────────────────────
-const RW = 5.0    // width  X
-const RD = 9.0    // depth  Z
-const RH = 3.8    // height Y
-const WT = 0.25   // wall thickness
+// ── ROOM DIMENSIONS — architect floorplan, in metres ─────────────────────────
+const RW = 3.27   // width  X  (narrow portrait room)
+const RD = 5.52   // depth  Z
+const RH = 3.0    // ceiling Y
+const WT = 0.20   // wall thickness
 
-// Doorway — right side of front wall (Z+), player enters bottom-right
-const DW = 1.4
-const DH = 2.4
-const DOOR_CX = (RW / 2) - WT - DW / 2 - 0.05   // doorway centre X (right side)
+// Entrance doorway — front wall (Z+), right side
+const DW = 1.0
+const DH = 2.2
+const DOOR_CX = (RW / 2) - WT - DW / 2   // X centre of doorway
 
-// ─────────────────────────────────────────────────────────────────────────────
-// U-SHAPED SWITCHBACK STAIRCASE (from floorplan)
-// Flight A: left side, climbs going -Z (away from entrance)
-// Landing:  flat platform at far end (near lightboxes)
-// Flight B: right side of A, returns +Z (back toward entrance) but climbing
-// Both flights side-by-side with a spine wall between them
-// ─────────────────────────────────────────────────────────────────────────────
-const SW   = 1.1    // each flight tread width
-const SR   = 0.16   // step rise (gentler)
-const SD   = 0.28   // step run (depth)
-const NS   = 7      // steps per flight  → top of each flight = 1.12 m
-const SP_W = 0.20   // central spine wall thickness
+// ── SWITCHBACK STAIRCASE ──────────────────────────────────────────────────────
+// Flight A: left wall, climbing toward back (-Z)
+// Half-landing at back
+// Flight B: parallel, returning toward front (+Z), continuing to climb → Level 2
+const SW   = 0.90   // tread width per flight
+const SR   = 0.17   // step rise
+const SD   = 0.27   // step run (depth)
+const NS   = 7      // steps per flight  →  top elevation = 7 × 0.17 = 1.19 m
+const SP_W = 0.12   // spine wall between the two flights
 
-// X extents — stair block hugs left wall
-const FA_X1 = -(RW / 2) + WT             // left edge of flight A = left wall inner
-const FA_X2 = FA_X1 + SW                  // right edge of flight A
+// X layout — stair block flush to left wall inner face
+const FA_X1 = -(RW / 2) + WT
+const FA_X2 = FA_X1 + SW
 const FA_CX = (FA_X1 + FA_X2) / 2
-
 const SPN_X1 = FA_X2
 const SPN_X2 = SPN_X1 + SP_W
-
 const FB_X1 = SPN_X2
 const FB_X2 = FB_X1 + SW
 const FB_CX = (FB_X1 + FB_X2) / 2
 
-// Z extents
-const FA_BASE_Z  = -1.0             // stairs start in back half of room (away from entrance)
-const FA_TOP_Z   = FA_BASE_Z - NS * SD    // = 2.2 - 1.82 = 0.38  (top of flight A)
-const LAND_DEPTH = 1.0
-const LAND_Z2    = FA_TOP_Z - LAND_DEPTH  // far edge of landing
+// Z layout — stairs fill most of room depth
+const FA_BASE_Z  = (RD / 2) - WT - 0.40    // base of Flight A (near front)
+const FA_TOP_Z   = FA_BASE_Z - NS * SD       // top of Flight A (toward back)
+const LAND_D     = 0.80                      // landing depth
+const LAND_Z2    = FA_TOP_Z - LAND_D         // back edge of landing
 const LAND_MID_Z = (FA_TOP_Z + LAND_Z2) / 2
+const FLIGHT_TOP_Y = NS * SR                 // 1.19 m — elevation at top of each flight
+const FB_BASE_Z  = LAND_Z2                   // Flight B starts at landing back edge
+const FB_TOP_Z   = FB_BASE_Z + NS * SD       // Flight B top (toward front)
 
-const FLIGHT_TOP_Y = NS * SR         // = 1.4m — top of flight A / bottom elevation of flight B
+// ── WELCOME LED BANNER — right wall, portrait, nearly floor-to-ceiling ────────
+const BAN_H   = 2.55   // banner height (leaves ~0.2 m gap top & bottom)
+const BAN_W   = 0.72   // banner width
+const BAN_BOT = 0.22   // gap from floor to banner bottom
+const BAN_Z   = 0.10   // Z centre (slightly toward entrance end)
 
-// Flight B starts at the landing far edge and climbs back +Z
-const FB_BASE_Z = LAND_Z2            // = -0.62
-const FB_TOP_Z  = FB_BASE_Z + NS * SD   // = -0.62 + 1.82 = 1.2
+// ── FURNITURE ─────────────────────────────────────────────────────────────────
+// Floorplan kiosk — free-standing, front-left (foot of stairs)
+const KIOSK_X  = FB_X2 + 0.15   // just right of stair block, near front
+const KIOSK_Z  = FA_BASE_Z - 0.3
+const KIOSK_SW = 0.60   // screen width
+const KIOSK_SH = 1.50   // screen height
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FURNITURE / FIXTURES
-// ─────────────────────────────────────────────────────────────────────────────
-// Welcome LED banner — right wall, near entrance (from floorplan: "Welcome LED" right side)
-// Banner sized to fill a prominent section of the right wall — portrait ratio ~1:2.5
-// matches the real artwork's tall narrow format
-const BAN_W   = 1.6    // width (portrait banner, fits right wall without crowding)
-const BAN_H   = 3.2    // height (nearly floor-to-ceiling at 3.8m room, bottom gap below)
-const BAN_BOT = 0.25   // gap above floor
-const BAN_Z   = 0.8    // Z position along right wall (centred in the near-entrance section)
-// POS counter — left wall, mid room
-const POS_W = 1.0, POS_H = 0.9, POS_D = 0.55
+// POS counter — left wall, mid-room
+const POS_D = 0.42, POS_H = 0.90, POS_WW = 0.85
 const POS_X = -(RW / 2) + WT + POS_D / 2
-const POS_Z = -0.2
-// Museum Guide curved desk — bottom-left corner (approx. with wedge of boxes)
-const MG_X  = -(RW / 2) + WT + 0.65
-const MG_Z  = (RD / 2) - WT - 0.65
-// Lightbox 1 & 2 — far wall, side by side
-const LB_W = 0.9, LB_H = 0.45
-const LB_Z = -(RD / 2) + WT + 0.05
-const LB1_X = -0.6, LB2_X = 0.6
-// Glowing pyramid — right side, near entrance (accent piece)
-const PYR_X  = (RW / 2) - 0.9
-const PYR_Z  = 2.6
-const PLI_W  = 0.45, PLI_H = 0.95, PLI_D = 0.45
-const PYR_COL = '#ffd060'
+const POS_Z = -0.60
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MATERIAL COLOURS
-// ─────────────────────────────────────────────────────────────────────────────
-const CREAM   = '#e8e2d4'
-const CEILING = '#ede8de'
-const TREAD   = '#7a5530'
-const RISER   = '#5e4020'
-const DARK    = '#1e1c18'
+// Museum Guide desk — front-left corner
+const MG_X = -(RW / 2) + WT + 0.40
+const MG_Z = (RD / 2) - WT - 0.55
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CANVAS TEXTURES
-// ─────────────────────────────────────────────────────────────────────────────
+// Lightboxes — back wall, side by side (two emissive panels near landing)
+const LB_W = 0.65, LB_H = 0.50
+const LB_Z  = -(RD / 2) + WT + 0.06
+const LB1_X = -0.38, LB2_X = 0.38
 
-// Rich AOM welcome banner — matches the reference artwork's style:
-// dark background, gold ornaments, figures, title hierarchy.
-// To use the REAL image: place it at public/textures/welcome-banner.png
-// and the THREE.TextureLoader call in useMemo will pick it up automatically.
+// ── MATERIAL COLOURS ──────────────────────────────────────────────────────────
+const WALL_COL  = '#1c1915'   // dark warm charcoal / espresso
+const CEIL_COL  = '#0d0b09'   // near-black ceiling
+const FLOOR_COL = '#6b4422'   // warm medium-brown wood
+const TREAD_COL = '#7a5530'   // stair tread — warm wood
+const RISER_COL = '#342010'   // dark riser
+const SPINE_COL = '#1a1612'   // spine wall — very dark
+const RAIL_COL  = '#5a3820'   // wall-mounted handrail
+
+// ── CANVAS TEXTURES (fallbacks) ───────────────────────────────────────────────
 function makeBannerCanvas() {
   const c = document.createElement('canvas')
   c.width = 512; c.height = 1280
   const ctx = c.getContext('2d')
 
-  // Deep dark background gradient (reference is very dark navy/black)
   const bg = ctx.createLinearGradient(0, 0, 0, 1280)
   bg.addColorStop(0,   '#070410')
   bg.addColorStop(0.3, '#0e0818')
@@ -111,495 +92,399 @@ function makeBannerCanvas() {
   bg.addColorStop(1,   '#060308')
   ctx.fillStyle = bg; ctx.fillRect(0, 0, 512, 1280)
 
-  // Gold floral top-left corner (reference has gold lacework)
-  ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1.5
-  for (let i = 0; i < 6; i++) {
-    ctx.beginPath(); ctx.arc(i * 12, 0, 28 - i * 4, 0, Math.PI / 2)
-    ctx.strokeStyle = `rgba(201,168,76,${0.8 - i * 0.12})`; ctx.stroke()
-  }
-  // Mirror bottom-right
-  ctx.save(); ctx.translate(512, 1280); ctx.rotate(Math.PI)
-  for (let i = 0; i < 6; i++) {
-    ctx.beginPath(); ctx.arc(i * 12, 0, 28 - i * 4, 0, Math.PI / 2)
-    ctx.strokeStyle = `rgba(201,168,76,${0.8 - i * 0.12})`; ctx.stroke()
-  }
-  ctx.restore()
-
-  // Outer gold border
   ctx.strokeStyle = '#b8941e'; ctx.lineWidth = 8; ctx.strokeRect(12, 12, 488, 1256)
   ctx.strokeStyle = '#e8d060'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 472, 1240)
 
-  // Cherry blossom branch suggestion (reference: top-right pink blossoms)
-  const blossom = (x, y, r, col) => {
-    ctx.fillStyle = col
-    for (let a = 0; a < 5; a++) {
-      ctx.beginPath()
-      ctx.ellipse(x + Math.cos(a * 1.257) * r * 0.7, y + Math.sin(a * 1.257) * r * 0.7, r, r * 0.6, a * 1.257, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    ctx.fillStyle = '#ffcc80'; ctx.beginPath(); ctx.arc(x, y, r * 0.3, 0, Math.PI * 2); ctx.fill()
-  }
-  ctx.globalAlpha = 0.55
-  blossom(400, 80,  11, '#e86070'); blossom(440, 50,  9, '#f08090')
-  blossom(460, 100, 8, '#e87080'); blossom(420, 120, 7, '#f09090')
-  ctx.globalAlpha = 1.0
-
-  // "WELCOME" header
   ctx.fillStyle = '#fffae8'; ctx.font = 'bold italic 54px serif'; ctx.textAlign = 'center'
   ctx.shadowColor = '#e8c040'; ctx.shadowBlur = 16
-  ctx.fillText('WELCOME', 256, 105)
+  ctx.fillText('WELCOME', 256, 110)
   ctx.shadowBlur = 0
-
-  // "— TO —" divider
   ctx.fillStyle = '#e8c060'; ctx.font = '22px serif'
-  ctx.fillText('— T O —', 256, 145)
-
-  // Ornament line
+  ctx.fillText('— T O —', 256, 150)
   ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(60, 162); ctx.lineTo(452, 162); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(60, 168); ctx.lineTo(452, 168); ctx.stroke()
 
-  // Large title — glowing gold
   ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 22
   ctx.fillStyle = '#ffd050'; ctx.font = 'bold 78px serif'
-  ctx.fillText('ASIAN', 256, 255)
+  ctx.fillText('ASIAN', 256, 260)
   ctx.fillStyle = '#f0c040'; ctx.font = 'bold 65px serif'
-  ctx.fillText('OPERATIC', 256, 335)
+  ctx.fillText('OPERATIC', 256, 340)
   ctx.fillStyle = '#ffd050'; ctx.font = 'bold 78px serif'
-  ctx.fillText('MUSEUM', 256, 420)
+  ctx.fillText('MUSEUM', 256, 425)
   ctx.shadowBlur = 0
 
-  // Centre ornament
   ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(80, 445); ctx.lineTo(432, 445); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(80, 450); ctx.lineTo(432, 450); ctx.stroke()
   ctx.fillStyle = '#c9a84c'; ctx.font = '16px serif'
-  ctx.fillText('✦  ✦  ✦', 256, 478)
+  ctx.fillText('✦  ✦  ✦', 256, 480)
 
-  // LEFT FIGURE: gold king (Sang Nila Utama) silhouette
-  ctx.save(); ctx.translate(115, 760)
-  // robe
+  // King silhouette
+  ctx.save(); ctx.translate(115, 780)
   ctx.fillStyle = 'rgba(180,130,35,0.72)'
   ctx.beginPath(); ctx.ellipse(0, -70, 32, 42, 0, 0, Math.PI * 2); ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(-28, -32); ctx.lineTo(-38, 60); ctx.lineTo(38, 60); ctx.lineTo(28, -32)
-  ctx.closePath(); ctx.fill()
-  // crown
+  ctx.beginPath(); ctx.moveTo(-28, -32); ctx.lineTo(-38, 60); ctx.lineTo(38, 60); ctx.lineTo(28, -32); ctx.closePath(); ctx.fill()
   ctx.fillStyle = '#c9a84c'
-  ctx.beginPath()
-  ctx.moveTo(-22, -105); ctx.lineTo(-28, -82); ctx.lineTo(-12, -90)
-  ctx.lineTo(0, -115); ctx.lineTo(12, -90); ctx.lineTo(28, -82)
-  ctx.lineTo(22, -105); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(-22, -105); ctx.lineTo(-28, -82); ctx.lineTo(-12, -90); ctx.lineTo(0, -115); ctx.lineTo(12, -90); ctx.lineTo(28, -82); ctx.lineTo(22, -105); ctx.closePath(); ctx.fill()
   ctx.restore()
 
-  // RIGHT FIGURE: red warrior woman (Mulan-esque) silhouette
-  ctx.save(); ctx.translate(395, 750)
-  // red robe
+  // Warrior woman silhouette
+  ctx.save(); ctx.translate(395, 770)
   ctx.fillStyle = 'rgba(160,28,28,0.75)'
   ctx.beginPath(); ctx.ellipse(0, -68, 30, 40, 0, 0, Math.PI * 2); ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(-24, -32); ctx.lineTo(-45, 65); ctx.lineTo(45, 65); ctx.lineTo(24, -32)
-  ctx.closePath(); ctx.fill()
-  // flowing cape
+  ctx.beginPath(); ctx.moveTo(-24, -32); ctx.lineTo(-45, 65); ctx.lineTo(45, 65); ctx.lineTo(24, -32); ctx.closePath(); ctx.fill()
   ctx.fillStyle = 'rgba(160,28,28,0.45)'
-  ctx.beginPath()
-  ctx.moveTo(24, -32); ctx.quadraticCurveTo(68, 0, 60, 65)
-  ctx.lineTo(45, 65); ctx.closePath(); ctx.fill()
-  // sword / spear tip
-  ctx.strokeStyle = '#aab8c8'; ctx.lineWidth = 3
-  ctx.beginPath(); ctx.moveTo(30, -80); ctx.lineTo(30, -120); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(24, -32); ctx.quadraticCurveTo(68, 0, 60, 65); ctx.lineTo(45, 65); ctx.closePath(); ctx.fill()
   ctx.restore()
 
-  // Costume on mannequin (centre bottom)
-  ctx.save(); ctx.translate(256, 850)
-  ctx.fillStyle = '#c8d8e8'
-  ctx.fillRect(-20, -60, 40, 100)
-  ctx.fillStyle = '#a0b8cc'
-  ctx.fillRect(-30, -45, 60, 20)
-  // decorative band
-  ctx.strokeStyle = '#4468a0'; ctx.lineWidth = 2
-  for (let i = 0; i < 6; i++) {
-    ctx.beginPath(); ctx.moveTo(-28, -40 + i * 15); ctx.lineTo(28, -40 + i * 15); ctx.stroke()
-  }
-  ctx.restore()
-
-  // Fan in background (centre, muted)
-  ctx.globalAlpha = 0.3
-  ctx.strokeStyle = '#b89040'; ctx.lineWidth = 1.5
-  for (let a = -0.5; a <= 0.5; a += 0.1) {
-    ctx.beginPath()
-    ctx.moveTo(256, 950)
-    ctx.lineTo(256 + Math.sin(a) * 120, 950 - Math.cos(a) * 100)
-    ctx.stroke()
-  }
-  ctx.beginPath(); ctx.arc(256, 950, 45, Math.PI + 0.5, Math.PI * 2 - 0.5)
-  ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 2.5; ctx.stroke()
-  ctx.globalAlpha = 1.0
-
-  // Divider
   ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(60, 980); ctx.lineTo(452, 980); ctx.stroke()
-
-  // Subtitle captions
-  ctx.fillStyle = '#d4b86a'; ctx.font = 'bold 18px serif'
-  ctx.fillText('SANG NILA UTAMA  ·  MULAN', 256, 1015)
-  ctx.fillStyle = '#b8a060'; ctx.font = '16px serif'
-  ctx.fillText('OPERATIC COSTUMES', 256, 1042)
-
-  ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(80, 1070); ctx.lineTo(432, 1070); ctx.stroke()
-
-  // Star row
-  for (let i = -2; i <= 2; i++) {
-    ctx.fillStyle = '#c9a84c'; ctx.beginPath()
-    ctx.arc(256 + i * 36, 1100, 4, 0, Math.PI * 2); ctx.fill()
-  }
-
-  // Bottom identity
+  ctx.beginPath(); ctx.moveTo(60, 990); ctx.lineTo(452, 990); ctx.stroke()
   ctx.fillStyle = '#8a7040'; ctx.font = '14px serif'
-  ctx.fillText('ASIAN OPERATIC MUSEUM · SINGAPORE', 256, 1165)
+  ctx.fillText('ASIAN OPERATIC MUSEUM · SINGAPORE', 256, 1175)
 
-  const t = new THREE.CanvasTexture(c)
-  return t
+  return new THREE.CanvasTexture(c)
 }
 
 function makeKioskTex() {
   const c = document.createElement('canvas')
   c.width = 256; c.height = 512
   const ctx = c.getContext('2d')
-  ctx.fillStyle = '#f0ede6'; ctx.fillRect(0, 0, 256, 512)
-  ctx.fillStyle = '#8b1a1a'; ctx.fillRect(0, 0, 256, 55)
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText('MUSEUM DIRECTORY', 128, 34)
+  ctx.fillStyle = '#0a0e14'; ctx.fillRect(0, 0, 256, 512)
+  ctx.fillStyle = '#1a2e48'; ctx.fillRect(0, 0, 256, 60)
+  ctx.fillStyle = '#7ab8e8'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'
+  ctx.fillText('MUSEUM DIRECTORY', 128, 38)
+
   const floors = [
-    { label: 'L1 · ENTRANCE', color: '#d4a84a', y: 72 },
-    { label: 'L2 · GALLERY',  color: '#4a7ab5', y: 155 },
-    { label: 'L3 · ARCHIVE',  color: '#5a9a6a', y: 238 },
+    { label: 'L1 · ENTRANCE',  color: '#d4a84a', y: 80 },
+    { label: 'L2 · GALLERY',   color: '#4a7ab5', y: 175 },
+    { label: 'L3 · ARCHIVE',   color: '#5a9a6a', y: 270 },
   ]
   floors.forEach(r => {
-    ctx.fillStyle = r.color + '33'; ctx.fillRect(18, r.y, 220, 70)
-    ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.strokeRect(18, r.y, 220, 70)
-    ctx.fillStyle = '#333'; ctx.font = 'bold 13px sans-serif'
-    ctx.fillText(r.label, 128, r.y + 41)
+    ctx.fillStyle = r.color + '22'; ctx.fillRect(16, r.y, 224, 72)
+    ctx.strokeStyle = r.color; ctx.lineWidth = 1.5; ctx.strokeRect(16, r.y, 224, 72)
+    ctx.fillStyle = r.color; ctx.font = 'bold 13px sans-serif'
+    ctx.fillText(r.label, 128, r.y + 42)
   })
-  ctx.fillStyle = '#666'; ctx.font = '12px sans-serif'
-  ctx.fillText('↑ Stairs to Level 02', 128, 365)
-  ctx.fillText('● You are here', 128, 385)
-  const t = new THREE.CanvasTexture(c)
-  return t
+  ctx.fillStyle = '#4a8ab8'; ctx.font = '11px sans-serif'
+  ctx.fillText('↑ Stairs to Level 02', 128, 380)
+  ctx.fillStyle = '#e8c060'
+  ctx.fillText('● You are here  (L1)', 128, 400)
+  return new THREE.CanvasTexture(c)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FLOOR DATA — for FirstPersonRig collision (plan units = world / S)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── COLLISION DATA for FirstPersonRig ─────────────────────────────────────────
+// footprint + walls must be in PLAN UNITS (world metres / LAYOUT_SCALE = 2.7)
+import { LAYOUT_SCALE } from '../data/museumMapModel'
 const S = LAYOUT_SCALE
-const planHX = (RW / 2) / S
-const planHZ = (RD / 2) / S
 
 export function getEntranceChamberFloorData(yOffset = 0) {
-  const inset = WT / S + 0.04
+  const hx = (RW / 2) / S
+  const hz = (RD / 2) / S
+  const ins = (WT / S) + 0.05
   return {
-    floorY: yOffset,
+    floorY : yOffset,
     footprint: [
-      { x: -planHX + inset, z: -planHZ + inset },
-      { x:  planHX - inset, z: -planHZ + inset },
-      { x:  planHX - inset, z:  planHZ - inset },
-      { x: -planHX + inset, z:  planHZ - inset },
+      { x: -hx + ins, z: -hz + ins },
+      { x:  hx - ins, z: -hz + ins },
+      { x:  hx - ins, z:  hz - ins },
+      { x: -hx + ins, z:  hz - ins },
     ],
     walls: [],
-    // spawn right of entrance doorway, facing into room (-Z)
-    spawn: [DOOR_CX - 0.2, (RD / 2) - 0.8],
-    short: 'L1',
+    spawn : [DOOR_CX - 0.15, (RD / 2) - 0.55],   // world X/Z, just inside entrance
+    short : 'L1',
     centerW: [0, 0],
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function EntranceChamber({ yOffset = 0 }) {
-  const spotRef  = useRef()
-  const targRef  = useRef()
+  const spotRef = useRef()
+  const targRef = useRef()
   useEffect(() => {
     if (spotRef.current && targRef.current)
       spotRef.current.target = targRef.current
   }, [])
 
   const tex = useMemo(() => {
-    const wood   = woodTexture();    wood.repeat.set(RW / 3, RD / 3)
-    const plstr  = plasterTexture(CREAM); plstr.repeat.set(3, 2)
-    const tread  = woodTexture();    tread.repeat.set(2, 0.5)
-    // Load real banner image; falls back to canvas automatically if file missing
+    const wood  = woodTexture(); wood.repeat.set(RW / 2.5, RD / 2.5)
+    const tread = woodTexture(); tread.repeat.set(2, 0.5)
     const bannerCanvas = makeBannerCanvas()
     const banner = new THREE.TextureLoader().load(
       'https://raw.githubusercontent.com/EARNOVAGAMING/museum-vr-sandbox/main/Banner%20first%20level.jpg',
-      (t) => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; bannerCanvas.dispose(); Object.assign(bannerCanvas, t); bannerCanvas.needsUpdate = true },
+      (t) => {
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping
+        // swap canvas out for real image in-place
+        bannerCanvas.image = t.image
+        bannerCanvas.needsUpdate = true
+      },
       undefined,
       () => { /* network error — canvas stays */ }
     )
-    // Start with canvas; TextureLoader replaces it in-place when image loads
-    const bannerTex = bannerCanvas
-    const kiosk  = makeKioskTex()
-    return { wood, plstr, tread, banner: bannerTex, kiosk }
+    void banner
+    const kiosk = makeKioskTex()
+    return { wood, tread, banner: bannerCanvas, kiosk }
   }, [])
 
   const y = yOffset
 
-  // Derived banner position (right wall, portrait)
-  const banX = (RW / 2) - WT - 0.05
-  const banY = y + BAN_BOT + BAN_H / 2
+  // Banner position — right wall
+  const banX = (RW / 2) - WT - 0.03
+  const banCY = y + BAN_BOT + BAN_H / 2
 
-  // Spine wall covers the full stair Z range + landing
-  const SPINE_Z_LEN = (FA_BASE_Z - LAND_Z2) + 0.01   // total Z depth of stair block
-  const SPINE_Z_MID = (FA_BASE_Z + LAND_Z2) / 2
-  const STAIR_FULL_Y = FLIGHT_TOP_Y * 2              // total stair height ≈ 2.24m
-  // Spine wall only rises to handrail height above upper flight top — a visible half-wall
-  const SPINE_HEIGHT = STAIR_FULL_Y + 0.15           // just above top step, not ceiling-high
+  // Handrail geometry helper — a thin rounded rod along the stair slope
+  // mounted on the left wall for Flight A, spine side for Flight B
+  const flightALen  = NS * SD
+  const flightBLen  = NS * SD
+  const stairAngleA = Math.atan2(NS * SR, NS * SD)   // slope angle
+  const railH       = 0.90   // rail height above step noses
 
   return (
     <group>
 
-      {/* ══ LIGHTING ══════════════════════════════════════════════════════════ */}
-      <ambientLight intensity={0.55} color="#fff4e6" />
-      {/* Main ceiling fills */}
-      <pointLight position={[0, y + RH - 0.3,  1.5]} intensity={14} distance={6} decay={1.3} color="#fff8f0" />
-      <pointLight position={[0, y + RH - 0.3, -2.0]} intensity={14} distance={6} decay={1.3} color="#fff8f0" />
-      <pointLight position={[0, y + RH - 0.3, -RD * 0.42]} intensity={10} distance={5} decay={1.4} color="#fff8f0" />
-      {/* Stair wash */}
-      <pointLight position={[FA_CX, y + RH - 0.4,  1.0]} intensity={5} distance={4} decay={2} color="#ffe8c0" />
-      <pointLight position={[FA_CX, y + RH - 0.4, -0.6]} intensity={5} distance={4} decay={2} color="#ffe8c0" />
-      {/* Banner spotlight */}
+      {/* ══ LIGHTING — moody, dim, glowing elements dominate ═════════════════ */}
+      {/* Very soft warm ambient — just enough to see walls in shadow */}
+      <ambientLight intensity={0.18} color="#ffd090" />
+
+      {/* Two recessed warm downlights in ceiling */}
+      <pointLight position={[0.3,  y + RH - 0.15,  1.0]} intensity={3.5} distance={3.5} decay={2} color="#ffb060" />
+      <pointLight position={[-0.2, y + RH - 0.15, -1.5]} intensity={3.0} distance={3.5} decay={2} color="#ffb060" />
+
+      {/* Stair wash — dim warm spot picking out step treads */}
+      <pointLight position={[FA_CX, y + RH - 0.3, FA_BASE_Z - 0.5]} intensity={4} distance={3} decay={2} color="#ffcc88" />
+      <pointLight position={[FB_CX, y + RH - 0.3, FB_TOP_Z  - 0.5]} intensity={4} distance={3} decay={2} color="#ffcc88" />
+
+      {/* BANNER GLOW — the visual hero, cast light into room */}
+      <pointLight position={[banX - 0.6, y + BAN_BOT + BAN_H * 0.55, BAN_Z]} intensity={22} distance={4.5} decay={1.6} color="#ffeacc" />
+      {/* Tight spotlight aimed at banner face */}
       <spotLight
         ref={spotRef}
-        position={[banX - 1.5, y + RH - 0.25, BAN_Z + 0.5]}
-        intensity={80}
-        angle={0.45}
-        penumbra={0.38}
-        distance={RH + 2}
-        decay={1.2}
-        color="#ffefd0"
+        position={[banX - 1.0, y + RH - 0.12, BAN_Z]}
+        intensity={60}
+        angle={0.42}
+        penumbra={0.35}
+        distance={RH + 1}
+        decay={1.4}
+        color="#fff4e0"
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
       />
-      <object3D ref={targRef} position={[banX, banY, BAN_Z]} />
-      {/* Lightbox glow */}
-      <pointLight position={[0, y + RH * 0.75, -(RD / 2) + 1.2]} intensity={8} distance={3.5} decay={1.6} color="#e8f0ff" />
-      {/* Pyramid glow */}
-      <pointLight position={[PYR_X, y + PLI_H + 0.4, PYR_Z]} intensity={5} distance={3} decay={1.8} color="#ffbb44" />
+      <object3D ref={targRef} position={[banX, banCY, BAN_Z]} />
 
-      {/* ══ FLOOR ═════════════════════════════════════════════════════════════ */}
+      {/* Kiosk cool-white glow */}
+      <pointLight position={[KIOSK_X, y + KIOSK_SH * 0.6, KIOSK_Z - 0.3]} intensity={6} distance={2.5} decay={2} color="#b8deff" />
+
+      {/* Lightbox glow on back wall */}
+      <pointLight position={[0, y + RH * 0.72, -(RD / 2) + 1.0]} intensity={5} distance={3} decay={1.8} color="#c8e0ff" />
+
+      {/* ══ FLOOR — warm medium-brown wood ════════════════════════════════════ */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} receiveShadow>
         <planeGeometry args={[RW, RD]} />
-        <meshStandardMaterial color="#6b4422" roughness={0.55} map={tex.wood} />
+        <meshStandardMaterial color={FLOOR_COL} roughness={0.55} map={tex.wood} />
       </mesh>
 
-      {/* ══ CEILING ═══════════════════════════════════════════════════════════ */}
+      {/* ══ CEILING — near black ══════════════════════════════════════════════ */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, y + RH, 0]}>
         <planeGeometry args={[RW, RD]} />
-        <meshStandardMaterial color={CEILING} roughness={0.92} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={CEIL_COL} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* ══ WALLS — cream plaster ═════════════════════════════════════════════ */}
+      {/* ══ WALLS — dark warm charcoal ════════════════════════════════════════ */}
       {/* Back wall (Z-) */}
       <mesh position={[0, y + RH / 2, -(RD / 2) + WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[RW, RH, WT]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
       {/* Left wall (X-) */}
       <mesh position={[-(RW / 2) + WT / 2, y + RH / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[WT, RH, RD]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
       {/* Right wall (X+) */}
       <mesh position={[(RW / 2) - WT / 2, y + RH / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[WT, RH, RD]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
-      {/* Front wall (Z+): left panel, right panel, header above doorway */}
-      {/* Left panel: from left wall to doorway left edge */}
+      {/* Front wall — left panel */}
       <mesh position={[
         (-(RW / 2) + WT + DOOR_CX - DW / 2) / 2,
         y + RH / 2,
         (RD / 2) - WT / 2
       ]} castShadow receiveShadow>
-        <boxGeometry args={[DOOR_CX - DW / 2 + RW / 2 - WT, RH, WT]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <boxGeometry args={[Math.max(0.001, DOOR_CX - DW / 2 + RW / 2 - WT), RH, WT]} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
-      {/* Right panel: from doorway right edge to right wall */}
+      {/* Front wall — right panel (very thin strip on hinge side) */}
       <mesh position={[
-        (DOOR_CX + DW / 2 + RW / 2 - WT) / 2,
+        (DOOR_CX + DW / 2 + (RW / 2) - WT) / 2,
         y + RH / 2,
         (RD / 2) - WT / 2
       ]} castShadow receiveShadow>
-        <boxGeometry args={[RW / 2 - WT - DOOR_CX - DW / 2, RH, WT]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <boxGeometry args={[Math.max(0.001, (RW / 2) - WT - DOOR_CX - DW / 2), RH, WT]} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
-      {/* Header above doorway */}
+      {/* Front wall — header above door */}
       <mesh position={[DOOR_CX, y + DH + (RH - DH) / 2, (RD / 2) - WT / 2]} castShadow receiveShadow>
         <boxGeometry args={[DW, RH - DH, WT]} />
-        <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
+        <meshStandardMaterial color={WALL_COL} roughness={0.88} />
       </mesh>
 
-      {/* ══ WELCOME LED BANNER — right wall, portrait, full artwork visible ══ */}
-      {/* Backing panel + frame border */}
-      <mesh position={[banX, banY, BAN_Z]} castShadow receiveShadow>
-        <boxGeometry args={[0.08, BAN_H + 0.14, BAN_W + 0.14]} />
-        <meshStandardMaterial color="#111008" roughness={0.35} metalness={0.15} />
+      {/* ══ WELCOME LED BANNER — right wall, portrait, emissive lightbox ══════ */}
+      {/* Thin backing slab (dark) */}
+      <mesh position={[banX + 0.01, banCY, BAN_Z]} castShadow>
+        <boxGeometry args={[0.05, BAN_H + 0.10, BAN_W + 0.10]} />
+        <meshStandardMaterial color="#0a0806" roughness={0.4} />
       </mesh>
-      {/* Gold frame inset */}
-      <mesh position={[banX - 0.02, banY, BAN_Z]}>
-        <boxGeometry args={[0.03, BAN_H + 0.06, BAN_W + 0.06]} />
-        <meshStandardMaterial color="#c9a84c" roughness={0.3} metalness={0.6} />
+      {/* Gold frame */}
+      <mesh position={[banX - 0.01, banCY, BAN_Z]}>
+        <boxGeometry args={[0.025, BAN_H + 0.04, BAN_W + 0.04]} />
+        <meshStandardMaterial color="#c9a84c" metalness={0.65} roughness={0.3} />
       </mesh>
-      {/* The banner artwork — single plane facing into the room (-X direction) */}
-      <mesh position={[banX - 0.05, banY, BAN_Z]} rotation={[0, Math.PI / 2, 0]}>
+      {/* Artwork plane — emissive so it glows like a lightbox */}
+      <mesh position={[banX - 0.03, banCY, BAN_Z]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[BAN_W, BAN_H]} />
         <meshStandardMaterial
           map={tex.banner}
-          emissive="#3a2808"
-          emissiveIntensity={0.18}
-          roughness={0.88}
+          emissiveMap={tex.banner}
+          emissive="#ffffff"
+          emissiveIntensity={1.1}
+          roughness={0.9}
           toneMapped={false}
         />
       </mesh>
 
-      {/* ══ POS COUNTER — left wall ═══════════════════════════════════════════ */}
+      {/* ══ FLOORPLAN KIOSK — free-standing, front-left ═══════════════════════ */}
+      {/* Thin base pole */}
+      <mesh position={[KIOSK_X, y + KIOSK_SH * 0.28, KIOSK_Z]} castShadow>
+        <boxGeometry args={[0.08, KIOSK_SH * 0.55, 0.08]} />
+        <meshStandardMaterial color="#1a1814" roughness={0.6} metalness={0.3} />
+      </mesh>
+      {/* Foot plate */}
+      <mesh position={[KIOSK_X, y + 0.04, KIOSK_Z]} castShadow>
+        <boxGeometry args={[0.40, 0.08, 0.30]} />
+        <meshStandardMaterial color="#111010" roughness={0.5} metalness={0.4} />
+      </mesh>
+      {/* Screen housing */}
+      <mesh position={[KIOSK_X, y + KIOSK_SH * 0.64, KIOSK_Z]} castShadow>
+        <boxGeometry args={[0.08, KIOSK_SH * 0.72, KIOSK_SW + 0.06]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.4} />
+      </mesh>
+      {/* Emissive screen face (facing -X into room) */}
+      <mesh position={[KIOSK_X - 0.05, y + KIOSK_SH * 0.64, KIOSK_Z]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[KIOSK_SW, KIOSK_SH * 0.70]} />
+        <meshStandardMaterial
+          map={tex.kiosk}
+          emissiveMap={tex.kiosk}
+          emissive="#ffffff"
+          emissiveIntensity={0.85}
+          roughness={0.9}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* ══ POS COUNTER — left wall, mid-room ════════════════════════════════ */}
       <mesh position={[POS_X, y + POS_H / 2, POS_Z]} castShadow receiveShadow>
-        <boxGeometry args={[POS_D, POS_H, POS_W]} />
-        <meshStandardMaterial color="#3a2e22" roughness={0.7} />
+        <boxGeometry args={[POS_D, POS_H, POS_WW]} />
+        <meshStandardMaterial color="#2e2416" roughness={0.75} />
       </mesh>
-      {/* counter top */}
-      <mesh position={[POS_X, y + POS_H + 0.03, POS_Z]} receiveShadow>
-        <boxGeometry args={[POS_D, 0.06, POS_W]} />
-        <meshStandardMaterial color="#2a2018" roughness={0.4} metalness={0.1} />
-      </mesh>
-      {/* Digital signage on counter */}
-      <mesh position={[POS_X + POS_D / 2 - 0.02, y + POS_H + 0.3, POS_Z]}>
-        <boxGeometry args={[0.04, 0.55, 0.38]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.3} />
-      </mesh>
-      <mesh position={[POS_X + POS_D / 2 - 0.04, y + POS_H + 0.3, POS_Z]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.36, 0.52]} />
-        <meshStandardMaterial map={tex.kiosk} emissive="#ffffff" emissiveIntensity={0.3} roughness={0.9} />
+      <mesh position={[POS_X, y + POS_H + 0.03, POS_Z]}>
+        <boxGeometry args={[POS_D + 0.06, 0.05, POS_WW + 0.06]} />
+        <meshStandardMaterial color="#1c1610" roughness={0.4} metalness={0.1} />
       </mesh>
 
-      {/* ══ MUSEUM GUIDE CURVED DESK — bottom-left corner ═════════════════════ */}
-      {/* Approximated as 3 boxes forming a quarter-circle arc */}
-      {[0, 30, 60].map((deg, i) => {
+      {/* ══ MUSEUM GUIDE DESK — front-left corner ════════════════════════════ */}
+      {[0, 35, 70].map((deg, i) => {
         const a = (deg * Math.PI) / 180
-        const r = 0.65
-        const dx = Math.sin(a) * r, dz = Math.cos(a) * r
+        const r = 0.48
         return (
-          <mesh key={i} position={[MG_X - dx, y + 0.45, MG_Z - dz]} rotation={[0, -a, 0]} castShadow receiveShadow>
-            <boxGeometry args={[0.38, 0.9, 0.22]} />
-            <meshStandardMaterial color="#4a3828" roughness={0.7} />
-          </mesh>
-        )
-      })}
-      {/* Guide desk top cap */}
-      {[0, 30, 60].map((deg, i) => {
-        const a = (deg * Math.PI) / 180
-        const r = 0.65
-        return (
-          <mesh key={`t${i}`} position={[MG_X - Math.sin(a) * r, y + 0.92, MG_Z - Math.cos(a) * r]} rotation={[0, -a, 0]}>
-            <boxGeometry args={[0.38, 0.05, 0.24]} />
-            <meshStandardMaterial color="#2e2018" roughness={0.45} />
+          <mesh key={i} position={[MG_X - Math.sin(a) * r, y + 0.44, MG_Z - Math.cos(a) * r]} rotation={[0, -a, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.32, 0.88, 0.20]} />
+            <meshStandardMaterial color="#2e2416" roughness={0.75} />
           </mesh>
         )
       })}
 
-      {/* ══ LIGHTBOX 1 & 2 — far wall ═════════════════════════════════════════ */}
+      {/* ══ LIGHTBOXES — back wall, two panels side by side ══════════════════ */}
       {[LB1_X, LB2_X].map((lx, i) => (
         <group key={i}>
-          <mesh position={[lx, y + RH * 0.72, LB_Z]} castShadow>
-            <boxGeometry args={[LB_W, LB_H, 0.08]} />
-            <meshStandardMaterial color="#c8d4e8" emissive="#8090c0" emissiveIntensity={0.6} roughness={0.4} />
+          <mesh position={[lx, y + RH * 0.68, LB_Z - 0.04]}>
+            <boxGeometry args={[LB_W + 0.06, LB_H + 0.06, 0.03]} />
+            <meshStandardMaterial color="#2a2820" roughness={0.6} />
           </mesh>
-          {/* Frame */}
-          <mesh position={[lx, y + RH * 0.72, LB_Z - 0.05]}>
-            <boxGeometry args={[LB_W + 0.08, LB_H + 0.08, 0.04]} />
-            <meshStandardMaterial color="#d0c8b8" roughness={0.5} />
+          <mesh position={[lx, y + RH * 0.68, LB_Z]} castShadow>
+            <boxGeometry args={[LB_W, LB_H, 0.06]} />
+            <meshStandardMaterial color="#c8dff8" emissive="#8ab0e0" emissiveIntensity={0.8} roughness={0.3} />
           </mesh>
         </group>
       ))}
 
-      {/* ══ GLOWING PYRAMID PEDESTAL ══════════════════════════════════════════ */}
-      <mesh position={[PYR_X, y + PLI_H / 2, PYR_Z]} castShadow>
-        <boxGeometry args={[PLI_W, PLI_H, PLI_D]} />
-        <meshStandardMaterial color="#2a2824" roughness={0.72} metalness={0.1} />
-      </mesh>
-      <mesh position={[PYR_X, y + PLI_H + 0.28, PYR_Z]} rotation={[0, Math.PI / 4, 0]} castShadow>
-        <coneGeometry args={[0.28, 0.56, 4, 1]} />
-        <meshStandardMaterial color={PYR_COL} emissive={PYR_COL} emissiveIntensity={2.2} roughness={0.12} metalness={0.1} />
-      </mesh>
+      {/* ══ SWITCHBACK STAIRCASE — warm wood, solid-fill risers ══════════════ */}
 
-      {/* ══ U-SHAPED SWITCHBACK STAIRCASE ════════════════════════════════════ */}
-      {/*
-          Looking from above (top = far wall / Z-):
-          ┌──────┬───┬──────┐
-          │  A   │ S │  B   │  ← landing at top (Z-)
-          │ ↑ ↑  │ P │  ↑ ↑ │
-          │ ↑ ↑  │ I │  ↑ ↑ │  Steps in each flight (climbing away from viewer in A,
-          │      │ N │      │   returning toward viewer in B but at higher elevation)
-          └──────┴───┴──────┘  ← base (Z+, near entrance)
-          A = flight A (left, goes -Z)
-          B = flight B (right, returns +Z but keeps climbing)
-          S = spine wall
-      */}
-
-      {/* FLIGHT A — 7 steps going -Z, solid fill from floor up */}
+      {/* FLIGHT A — climbing toward back (-Z), 7 steps */}
       {Array.from({ length: NS }, (_, i) => {
-        const topY = (i + 1) * SR          // top of this step
-        const boxH = topY                   // solid fill from y=0 to topY
+        const topY = (i + 1) * SR
         const cz   = FA_BASE_Z - i * SD - SD / 2
         return (
-          <mesh key={`fa${i}`} position={[FA_CX, y + boxH / 2, cz]} castShadow receiveShadow>
-            <boxGeometry args={[SW, boxH, SD]} />
-            <meshStandardMaterial color={i % 2 === 0 ? TREAD : RISER} roughness={0.65} map={tex.tread} />
+          <mesh key={`fa${i}`} position={[FA_CX, y + topY / 2, cz]} castShadow receiveShadow>
+            <boxGeometry args={[SW, topY, SD]} />
+            <meshStandardMaterial color={i % 2 === 0 ? TREAD_COL : RISER_COL} roughness={0.65} map={i % 2 === 0 ? tex.tread : null} />
           </mesh>
         )
       })}
 
-      {/* LANDING — solid block from floor up to flight A top, full stair width */}
+      {/* FLIGHT A — wall-mounted handrail, left wall side */}
+      <mesh
+        position={[FA_X1 - 0.03, y + FLIGHT_TOP_Y * 0.55 + railH * 0.5, (FA_BASE_Z + FA_TOP_Z) / 2]}
+        rotation={[stairAngleA, 0, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.06, 0.06, Math.hypot(NS * SD, NS * SR) + 0.2]} />
+        <meshStandardMaterial color={RAIL_COL} roughness={0.55} />
+      </mesh>
+
+      {/* HALF-LANDING */}
       <mesh position={[(FA_X1 + FB_X2) / 2, y + FLIGHT_TOP_Y / 2, LAND_MID_Z]} castShadow receiveShadow>
-        <boxGeometry args={[FA_X2 - FA_X1 + SP_W + SW, FLIGHT_TOP_Y, LAND_DEPTH]} />
-        <meshStandardMaterial color={RISER} roughness={0.65} />
+        <boxGeometry args={[SW * 2 + SP_W, FLIGHT_TOP_Y, LAND_D]} />
+        <meshStandardMaterial color={RISER_COL} roughness={0.7} />
       </mesh>
-      {/* Landing top tread */}
-      <mesh position={[(FA_X1 + FB_X2) / 2, y + FLIGHT_TOP_Y + 0.02, LAND_MID_Z]} receiveShadow>
-        <boxGeometry args={[FA_X2 - FA_X1 + SP_W + SW, 0.04, LAND_DEPTH]} />
-        <meshStandardMaterial color={TREAD} roughness={0.55} map={tex.tread} />
+      {/* Landing tread surface */}
+      <mesh position={[(FA_X1 + FB_X2) / 2, y + FLIGHT_TOP_Y + 0.015, LAND_MID_Z]} receiveShadow>
+        <boxGeometry args={[SW * 2 + SP_W, 0.03, LAND_D]} />
+        <meshStandardMaterial color={TREAD_COL} roughness={0.55} map={tex.tread} />
       </mesh>
 
-      {/* FLIGHT B — 7 steps going +Z (returning), climbing from FLIGHT_TOP_Y up */}
+      {/* FLIGHT B — returning toward front (+Z), climbing from FLIGHT_TOP_Y */}
       {Array.from({ length: NS }, (_, i) => {
-        const fromY = FLIGHT_TOP_Y          // flight B base elevation
-        const topY  = fromY + (i + 1) * SR  // top of this step
-        const boxH  = topY                  // solid fill from y=0 (looks grounded)
-        const cz    = FB_BASE_Z + i * SD + SD / 2
+        const topY = FLIGHT_TOP_Y + (i + 1) * SR
+        const cz   = FB_BASE_Z + i * SD + SD / 2
         return (
-          <mesh key={`fb${i}`} position={[FB_CX, y + boxH / 2, cz]} castShadow receiveShadow>
-            <boxGeometry args={[SW, boxH, SD]} />
-            <meshStandardMaterial color={i % 2 === 0 ? TREAD : RISER} roughness={0.65} map={tex.tread} />
+          <mesh key={`fb${i}`} position={[FB_CX, y + topY / 2, cz]} castShadow receiveShadow>
+            <boxGeometry args={[SW, topY, SD]} />
+            <meshStandardMaterial color={i % 2 === 0 ? TREAD_COL : RISER_COL} roughness={0.65} map={i % 2 === 0 ? tex.tread : null} />
           </mesh>
         )
       })}
 
-      {/* SPINE WALL — runs the full Z length of the stair block */}
-      <mesh position={[(SPN_X1 + SPN_X2) / 2, y + SPINE_HEIGHT / 2, SPINE_Z_MID]} castShadow receiveShadow>
-        <boxGeometry args={[SP_W, SPINE_HEIGHT, SPINE_Z_LEN]} />
-        <meshStandardMaterial color={DARK} roughness={0.8} />
+      {/* FLIGHT B — wall-mounted handrail, spine wall side */}
+      <mesh
+        position={[FB_X1 + 0.03, y + FLIGHT_TOP_Y + NS * SR * 0.5 + railH * 0.4, (FB_BASE_Z + FB_TOP_Z) / 2]}
+        rotation={[-stairAngleA, 0, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.06, 0.06, Math.hypot(NS * SD, NS * SR) + 0.2]} />
+        <meshStandardMaterial color={RAIL_COL} roughness={0.55} />
       </mesh>
 
-      {/* OUTER STRINGER WALLS — close the exposed sides of both flights */}
-      {/* Flight A outer (left) — from floor up to step height along Z */}
-      <mesh position={[FA_X1 - 0.06, y + FLIGHT_TOP_Y / 2, (FA_BASE_Z + FA_TOP_Z) / 2]} castShadow>
-        <boxGeometry args={[0.12, FLIGHT_TOP_Y, NS * SD]} />
-        <meshStandardMaterial color={RISER} roughness={0.72} />
-      </mesh>
-      {/* Flight B outer (right) — same */}
-      <mesh position={[FB_X2 + 0.06, y + SPINE_HEIGHT / 2, (FB_BASE_Z + FB_TOP_Z) / 2]} castShadow>
-        <boxGeometry args={[0.12, SPINE_HEIGHT, NS * SD]} />
-        <meshStandardMaterial color={RISER} roughness={0.72} />
-      </mesh>
+      {/* SPINE WALL — separates the two flights, full stair height */}
+      {(() => {
+        const spineLen = (FA_BASE_Z - LAND_Z2)
+        const spineMidZ = (FA_BASE_Z + LAND_Z2) / 2
+        const spineH = FLIGHT_TOP_Y * 2 + SR + 0.10
+        return (
+          <mesh position={[(SPN_X1 + SPN_X2) / 2, y + spineH / 2, spineMidZ]} castShadow receiveShadow>
+            <boxGeometry args={[SP_W, spineH, spineLen]} />
+            <meshStandardMaterial color={SPINE_COL} roughness={0.9} />
+          </mesh>
+        )
+      })()}
 
     </group>
   )
