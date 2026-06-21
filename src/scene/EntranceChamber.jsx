@@ -140,6 +140,26 @@ const TREAD_COL = '#7a5530'  // medium walnut wood tread
 const RISER_COL = '#5e4020'
 const RAIL_COL = '#3b2510'   // dark espresso rail cap
 
+// Closed stringer — a solid angled side panel for a flight of stairs. `pts` is
+// a right-triangle in the shape's local (a,b) plane; it's extruded by
+// `thickness` then rotated/positioned to sit flush against the outer step edge.
+function Stringer({ pts, thickness = 0.05, position, rotation, map }) {
+  const geom = useMemo(() => {
+    const shape = new THREE.Shape()
+    shape.moveTo(pts[0][0], pts[0][1])
+    shape.lineTo(pts[1][0], pts[1][1])
+    shape.lineTo(pts[2][0], pts[2][1])
+    shape.closePath()
+    return new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <mesh geometry={geom} position={position} rotation={rotation} castShadow receiveShadow>
+      <meshStandardMaterial color={RISER_COL} roughness={0.7} map={map || null} />
+    </mesh>
+  )
+}
+
 export default function EntranceChamber({ yOffset = 0 }) {
   const spotRef = useRef()
   const targetRef = useRef()
@@ -269,39 +289,70 @@ export default function EntranceChamber({ yOffset = 0 }) {
         <meshStandardMaterial color={pyrCol} emissive={pyrCol} emissiveIntensity={2.2} roughness={0.12} metalness={0.1} />
       </mesh>
 
-      {/* ══ L-SHAPED STAIRCASE — exact loop math, ONE box per step ══════════════ */}
+      {/* ══ L-SHAPED STAIRCASE — solid steps (tread + riser fill) + stringers ══ */}
       <group position={[STAIR_ORIGIN[0], y, STAIR_ORIGIN[1]]}>
 
-        {/* FLIGHT 1 — rises straight ahead along -Z */}
+        {/* FLIGHT 1 — climbs straight back (-Z), steps face the player */}
         {Array.from({ length: FLIGHT_STEPS }, (_, i) => (
-          <mesh
-            key={`f1-${i}`}
-            position={[0, 0.09 + i * STEP_RISE, -(i * STEP_D)]}
-            castShadow receiveShadow
-          >
-            <boxGeometry args={[STEP_W, STEP_RISE, STEP_D]} />
-            <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
-          </mesh>
+          <group key={`f1-${i}`}>
+            {/* tread (top wood surface) */}
+            <mesh position={[0, 0.09 + i * STEP_RISE, -(i * STEP_D)]} castShadow receiveShadow>
+              <boxGeometry args={[STEP_W, STEP_RISE, STEP_D]} />
+              <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
+            </mesh>
+            {/* riser fill — solid block down to the floor (no gap underneath) */}
+            {i > 0 && (
+              <mesh position={[0, (i * STEP_RISE) / 2, -(i * STEP_D)]} castShadow receiveShadow>
+                <boxGeometry args={[STEP_W, i * STEP_RISE, STEP_D]} />
+                <meshStandardMaterial color={RISER_COL} roughness={0.7} map={tex.tread} />
+              </mesh>
+            )}
+          </group>
         ))}
 
-        {/* LANDING — flat square, top surface flush with flight-1 top (y = 1.08) */}
-        <mesh position={[0, 1.08 - STEP_RISE / 2, -1.95]} castShadow receiveShadow>
-          <boxGeometry args={[STEP_W, STEP_RISE, STEP_W]} />
-          <meshStandardMaterial color={RISER_COL} roughness={0.6} map={tex.tread} />
+        {/* LANDING — solid block to the floor, top flush at y = 1.08 */}
+        <mesh position={[0, 0.54, -1.95]} castShadow receiveShadow>
+          <boxGeometry args={[STEP_W, 1.08, STEP_W]} />
+          <meshStandardMaterial color={RISER_COL} roughness={0.7} map={tex.tread} />
+        </mesh>
+        <mesh position={[0, 1.06, -1.95]} receiveShadow>
+          <boxGeometry args={[STEP_W, 0.05, STEP_W]} />
+          <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
         </mesh>
 
-        {/* FLIGHT 2 — turns LEFT, rises along -X (0.3 run runs along X) */}
+        {/* FLIGHT 2 — turns LEFT, climbs along -X; steps rotated 90° from flight 1 */}
         {Array.from({ length: FLIGHT_STEPS }, (_, i) => (
-          <mesh
-            key={`f2-${i}`}
-            position={[-(0.6 + i * STEP_D), 1.17 + i * STEP_RISE, -1.95]}
-            castShadow receiveShadow
-          >
-            <boxGeometry args={[STEP_D, STEP_RISE, STEP_W]} />
-            <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
-          </mesh>
+          <group key={`f2-${i}`}>
+            {/* tread */}
+            <mesh position={[-(0.6 + i * STEP_D), 1.17 + i * STEP_RISE, -1.95]} castShadow receiveShadow>
+              <boxGeometry args={[STEP_D, STEP_RISE, STEP_W]} />
+              <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
+            </mesh>
+            {/* riser fill — solid block down to the landing top (y = 1.08) */}
+            {i > 0 && (
+              <mesh position={[-(0.6 + i * STEP_D), 1.08 + (i * STEP_RISE) / 2, -1.95]} castShadow receiveShadow>
+                <boxGeometry args={[STEP_D, i * STEP_RISE, STEP_W]} />
+                <meshStandardMaterial color={RISER_COL} roughness={0.7} map={tex.tread} />
+              </mesh>
+            )}
+          </group>
         ))}
 
+        {/* CLOSED STRINGERS — solid angled side panels on each flight's OUTER edge */}
+        {/* Flight 1 outer edge = +X side; triangle in (z,y), extruded along X */}
+        <Stringer
+          pts={[[0.15, 0], [-1.65, 0], [-1.65, 1.08]]}
+          position={[0.62, 0, 0]}
+          rotation={[0, -Math.PI / 2, 0]}
+          map={tex.tread}
+        />
+        {/* Flight 2 outer edge = -Z side; triangle in (x,y), extruded along Z */}
+        <Stringer
+          pts={[[-0.45, 1.08], [-2.25, 1.08], [-2.25, 2.16]]}
+          position={[0, 0, -2.57]}
+          rotation={[0, 0, 0]}
+          map={tex.tread}
+        />
       </group>
 
       {/* ══ MAP KIOSK ═════════════════════════════════════════════════════════ */}
