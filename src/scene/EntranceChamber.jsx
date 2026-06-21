@@ -13,33 +13,16 @@ const WT = 0.3    // wall thickness
 const DW = 1.8
 const DH = 2.6
 
-// ── Staircase geometry ───────────────────────────────────────────────────────
-// Lower flight: rises along -Z from near-front toward back-left
-const STEP_W      = 1.5    // tread width
-const STEP_RISE   = 0.18   // height per step
-const STEP_RUN    = 0.28   // depth per step
-const LOWER_STEPS = 6      // steps in lower flight
-const UPPER_STEPS = 6      // steps in upper flight (turns left, along -X)
-
-// Lower flight starts from floor at X = -RW/2 + WT + STEP_W/2
-const STAIR_X = -(RW / 2) + WT + STEP_W / 2   // ~-4.1
-// Lower flight bottom Z (front of first step) — inside room near front wall
-const LOWER_BASE_Z = RD / 2 - WT - 0.6        // start near front wall
-
-// Landing at top of lower flight
-const LAND_H = LOWER_STEPS * STEP_RISE         // 1.08m
-const LAND_Z = LOWER_BASE_Z - LOWER_STEPS * STEP_RUN
-const LAND_W = STEP_W
-const LAND_D = STEP_W                           // square landing
-
-// Upper flight turns left (along -X)
-// Starts at right edge of landing, goes left (X-)
-const UPPER_BASE_X = STAIR_X + STEP_W / 2      // right edge of lower flight
-const UPPER_Y = LAND_H
-const UPPER_Z = LAND_Z - LAND_D / 2 + STEP_W / 2  // centred on landing depth
-
-// Top of upper flight elevation
-const TOP_H = LAND_H + UPPER_STEPS * STEP_RISE   // 1.08 + 1.08 = 2.16m
+// ── Staircase (EXACT spec) ───────────────────────────────────────────────────
+// One simple box per step — no overlap, no rotation. Loop math below is in
+// LOCAL coords; the whole rig is translated to the back-left of the room by
+// STAIR_ORIGIN. Flight 1 rises along -Z, then a square landing, then Flight 2
+// turns LEFT and rises along -X to the Level 02 floor height (~2.16m).
+const STEP_W = 1.2          // tread width
+const STEP_D = 0.3          // tread depth (run)
+const STEP_RISE = 0.18      // step height
+const FLIGHT_STEPS = 6
+const STAIR_ORIGIN = [-1.2, -1.6]   // [worldX, worldZ] offset for the staircase
 
 // ── Plinth + pyramid ────────────────────────────────────────────────────────
 const PLI_W = 0.55
@@ -182,55 +165,11 @@ export default function EntranceChamber({ yOffset = 0 }) {
   const plinthTopY = y + PLI_H
   const pyrSize = 0.36
 
-  // ── Derived stair positions ──────────────────────────────────────────────
-  // Lower flight: each step i (0-based) sits at progressively higher Z-
-  // Tread centre: Z = LOWER_BASE_Z - (i+0.5)*STEP_RUN, Y = (i+0.5)*STEP_RISE
-  // We render as individual step blocks (full cumulative height stack)
-  const lowerSteps = Array.from({ length: LOWER_STEPS }, (_, i) => ({
-    x: STAIR_X,
-    y: y + (i * STEP_RISE) + STEP_RISE / 2,
-    z: LOWER_BASE_Z - (i + 0.5) * STEP_RUN,
-    // Each step is a block: full width, STEP_RUN deep, cumulative height
-    w: STEP_W, h: (i + 1) * STEP_RISE, d: STEP_RUN,
-  }))
-
-  // Landing
-  const landCX = STAIR_X
-  const landCZ = LOWER_BASE_Z - LOWER_STEPS * STEP_RUN - LAND_D / 2
-  const landY = y + LAND_H
-
-  // Upper flight turns left (-X), starting from right edge of landing
-  // step i goes further left and higher
-  const upperStartX = STAIR_X + STEP_W / 2
-  const upperSteps = Array.from({ length: UPPER_STEPS }, (_, i) => ({
-    x: upperStartX - (i + 0.5) * STEP_RUN,
-    y: landY + (i * STEP_RISE) + STEP_RISE / 2,
-    z: landCZ + LAND_D / 2 - STEP_W / 2,
-    w: STEP_RUN, h: (i + 1) * STEP_RISE, d: STEP_W,
-  }))
-
-  // Handrail half-wall: solid panel on the open (room-facing) side
-  // Lower flight: right side (X+ of flight) = STAIR_X + STEP_W/2
-  const railThick = 0.12
-  const railH = 0.9
-  // Lower flight half-wall
-  const lowerRailX = STAIR_X + STEP_W / 2 + railThick / 2
-  const lowerRailZ = LOWER_BASE_Z - (LOWER_STEPS * STEP_RUN) / 2
-  const lowerRailLen = LOWER_STEPS * STEP_RUN
-  const lowerRailAngle = Math.atan2(STEP_RISE, STEP_RUN) // slope angle
-  const lowerRailMidY = y + LAND_H / 2
-
-  // Upper flight half-wall: south side (Z+ of upper flight)
-  const upperRailZ = landCZ + LAND_D / 2 - STEP_W + railThick / 2
-  const upperRailX = upperStartX - (UPPER_STEPS * STEP_RUN) / 2
-  const upperRailLen = UPPER_STEPS * STEP_RUN
-  const upperRailMidY = landY + LAND_H / 2
-
-  // Ceiling wall wash: pointLights along the top of the staircase wall
+  // Staircase wall-wash accent lights (above the new staircase)
   const wallWashLights = [
-    { x: STAIR_X, y: y + RH - 0.4, z: LOWER_BASE_Z - 0.5 },
-    { x: STAIR_X, y: y + RH - 0.4, z: LOWER_BASE_Z - 1.5 },
-    { x: STAIR_X - 1.0, y: y + RH - 0.4, z: landCZ },
+    { x: STAIR_ORIGIN[0], y: y + RH - 0.4, z: STAIR_ORIGIN[1] - 0.8 },
+    { x: STAIR_ORIGIN[0], y: y + RH - 0.4, z: STAIR_ORIGIN[1] - 2.0 },
+    { x: STAIR_ORIGIN[0] - 1.5, y: y + RH - 0.4, z: STAIR_ORIGIN[1] - 1.95 },
   ]
 
   return (
@@ -330,85 +269,39 @@ export default function EntranceChamber({ yOffset = 0 }) {
         <meshStandardMaterial color={pyrCol} emissive={pyrCol} emissiveIntensity={2.2} roughness={0.12} metalness={0.1} />
       </mesh>
 
-      {/* ══ L-SHAPED STAIRCASE ════════════════════════════════════════════════ */}
+      {/* ══ L-SHAPED STAIRCASE — exact loop math, ONE box per step ══════════════ */}
+      <group position={[STAIR_ORIGIN[0], y, STAIR_ORIGIN[1]]}>
 
-      {/* Lower flight — rises along -Z (front-to-back) */}
-      {lowerSteps.map((s, i) => (
-        <group key={`ls${i}`}>
-          {/* Tread (top face visible surface) */}
-          <mesh position={[s.x, y + i * STEP_RISE + STEP_RISE - 0.01, s.z]} receiveShadow castShadow>
-            <boxGeometry args={[STEP_W, 0.04, STEP_RUN]} />
-            <meshStandardMaterial color={TREAD_COL} roughness={0.5} map={tex.tread} />
+        {/* FLIGHT 1 — rises straight ahead along -Z */}
+        {Array.from({ length: FLIGHT_STEPS }, (_, i) => (
+          <mesh
+            key={`f1-${i}`}
+            position={[0, 0.09 + i * STEP_RISE, -(i * STEP_D)]}
+            castShadow receiveShadow
+          >
+            <boxGeometry args={[STEP_W, STEP_RISE, STEP_D]} />
+            <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
           </mesh>
-          {/* Riser block (full stacked height underneath tread) */}
-          <mesh position={[s.x, s.y, s.z]} receiveShadow castShadow>
-            <boxGeometry args={[s.w, s.h, s.d]} />
-            <meshStandardMaterial color={RISER_COL} roughness={0.75} />
+        ))}
+
+        {/* LANDING — flat square, top surface flush with flight-1 top (y = 1.08) */}
+        <mesh position={[0, 1.08 - STEP_RISE / 2, -1.95]} castShadow receiveShadow>
+          <boxGeometry args={[STEP_W, STEP_RISE, STEP_W]} />
+          <meshStandardMaterial color={RISER_COL} roughness={0.6} map={tex.tread} />
+        </mesh>
+
+        {/* FLIGHT 2 — turns LEFT, rises along -X (0.3 run runs along X) */}
+        {Array.from({ length: FLIGHT_STEPS }, (_, i) => (
+          <mesh
+            key={`f2-${i}`}
+            position={[-(0.6 + i * STEP_D), 1.17 + i * STEP_RISE, -1.95]}
+            castShadow receiveShadow
+          >
+            <boxGeometry args={[STEP_D, STEP_RISE, STEP_W]} />
+            <meshStandardMaterial color={TREAD_COL} roughness={0.6} map={tex.tread} />
           </mesh>
-        </group>
-      ))}
+        ))}
 
-      {/* Mid landing */}
-      <mesh position={[landCX, landY - 0.04, landCZ]} receiveShadow castShadow>
-        <boxGeometry args={[LAND_W, LAND_H * 2 + 0.08, LAND_D]} />
-        <meshStandardMaterial color={RISER_COL} roughness={0.75} />
-      </mesh>
-      {/* Landing top tread */}
-      <mesh position={[landCX, landY + 0.01, landCZ]} receiveShadow>
-        <boxGeometry args={[LAND_W, 0.04, LAND_D]} />
-        <meshStandardMaterial color={TREAD_COL} roughness={0.5} map={tex.tread} />
-      </mesh>
-
-      {/* Upper flight — turns left, rises along -X */}
-      {upperSteps.map((s, i) => (
-        <group key={`us${i}`}>
-          <mesh position={[s.x, landY + i * STEP_RISE + STEP_RISE - 0.01, s.z]} receiveShadow castShadow>
-            <boxGeometry args={[STEP_RUN, 0.04, STEP_W]} />
-            <meshStandardMaterial color={TREAD_COL} roughness={0.5} map={tex.tread} />
-          </mesh>
-          <mesh position={[s.x, s.y, s.z]} receiveShadow castShadow>
-            <boxGeometry args={[s.w, s.h, s.d]} />
-            <meshStandardMaterial color={RISER_COL} roughness={0.75} />
-          </mesh>
-        </group>
-      ))}
-
-      {/* ══ HANDRAIL HALF-WALLS ═══════════════════════════════════════════════ */}
-      {/* Lower flight — solid half-wall on open (right/X+) side, tilted with slope */}
-      <group
-        position={[lowerRailX, lowerRailMidY + railH / 2, lowerRailZ]}
-        rotation={[lowerRailAngle, 0, 0]}
-      >
-        <mesh castShadow>
-          <boxGeometry args={[railThick, railH, lowerRailLen + 0.05]} />
-          <meshStandardMaterial color={RAIL_COL} roughness={0.55} />
-        </mesh>
-        {/* Rail cap on top */}
-        <mesh position={[0, railH / 2 + 0.03, 0]}>
-          <boxGeometry args={[railThick + 0.04, 0.06, lowerRailLen + 0.08]} />
-          <meshStandardMaterial color="#5c3a18" roughness={0.4} />
-        </mesh>
-      </group>
-
-      {/* Landing corner post */}
-      <mesh position={[lowerRailX, landY + railH / 2, landCZ + LAND_D / 2]} castShadow>
-        <boxGeometry args={[railThick + 0.04, railH, railThick + 0.04]} />
-        <meshStandardMaterial color={RAIL_COL} roughness={0.55} />
-      </mesh>
-
-      {/* Upper flight — half-wall on open (front/Z+) side */}
-      <group
-        position={[upperRailX, upperRailMidY + railH / 2, upperRailZ]}
-        rotation={[0, 0, lowerRailAngle]}
-      >
-        <mesh castShadow>
-          <boxGeometry args={[upperRailLen + 0.05, railH, railThick]} />
-          <meshStandardMaterial color={RAIL_COL} roughness={0.55} />
-        </mesh>
-        <mesh position={[0, railH / 2 + 0.03, 0]}>
-          <boxGeometry args={[upperRailLen + 0.08, 0.06, railThick + 0.04]} />
-          <meshStandardMaterial color="#5c3a18" roughness={0.4} />
-        </mesh>
       </group>
 
       {/* ══ MAP KIOSK ═════════════════════════════════════════════════════════ */}
