@@ -3,12 +3,14 @@ import { woodTexture } from '../textures/procedural.js'
 import { createAomMuseumMap, LAYOUT_SCALE, HEIGHT_SCALE } from '../data/museumMapModel.js'
 import { buildLevelSpec, pointInFootprint } from '../data/museumMapScene.js'
 
-// ── Level 01 entrance chamber constants (architect floorplan, metres) ─────────
-const RW = 3.27, RD = 5.52, RH = 3.0, WT = 0.20
-const DW = 1.0,  DH = 2.2
+// ── Level 01 — VR-comfort scale: footprint ×1.4 vs plan, ceiling ×1.2 ─────────
+// Plan: 3.27 × 5.52 × 3.0 m  →  VR: 4.60 × 7.70 × 3.6 m
+const RW = 4.60, RD = 7.70, RH = 3.60, WT = 0.28
+const DW = 1.40, DH = 2.45
 const DOOR_CX = (RW / 2) - WT - DW / 2
 
-const SW = 0.90, SR = 0.17, SD = 0.27, NS = 7, SP_W = 0.12
+// Staircase ×1.4 — proportions identical, just roomier
+const SW = 1.26, SR = 0.24, SD = 0.38, NS = 7, SP_W = 0.17
 const FA_X1 = -(RW / 2) + WT
 const FA_X2 = FA_X1 + SW
 const FA_CX = (FA_X1 + FA_X2) / 2
@@ -16,24 +18,25 @@ const SPN_X1 = FA_X2, SPN_X2 = SPN_X1 + SP_W
 const FB_X1 = SPN_X2
 const FB_X2 = FB_X1 + SW
 const FB_CX = (FB_X1 + FB_X2) / 2
-const FA_BASE_Z  = (RD / 2) - WT - 0.40
+const FA_BASE_Z  = (RD / 2) - WT - 0.56    // 0.40 × 1.4
 const FA_TOP_Z   = FA_BASE_Z - NS * SD
-const LAND_D     = 0.80
+const LAND_D     = 1.12                     // 0.80 × 1.4
 const LAND_Z2    = FA_TOP_Z - LAND_D
 const LAND_MID_Z = (FA_TOP_Z + LAND_Z2) / 2
-const FLIGHT_TOP_Y = NS * SR
+const FLIGHT_TOP_Y = NS * SR               // 7 × 0.24 = 1.68 m
 const FB_BASE_Z  = LAND_Z2
 const FB_TOP_Z   = FB_BASE_Z + NS * SD
 
-const BAN_H = 2.55, BAN_W = 0.72, BAN_BOT = 0.22, BAN_Z = 0.10
-const KIOSK_X = FB_X2 + 0.15, KIOSK_Z = FA_BASE_Z - 0.30
-const KIOSK_SW = 0.60, KIOSK_SH = 1.50
-const POS_D = 0.42, POS_H = 0.90, POS_WW = 0.85
-const POS_X = -(RW / 2) + WT + POS_D / 2, POS_Z = -0.60
-const MG_X = -(RW / 2) + WT + 0.40, MG_Z = (RD / 2) - WT - 0.55
-const LB_W = 0.65, LB_H = 0.50
+// Furniture ×1.4
+const BAN_H = 3.20, BAN_W = 1.00, BAN_BOT = 0.25, BAN_Z = 0.10
+const KIOSK_X = FB_X2 + 0.20, KIOSK_Z = FA_BASE_Z - 0.42
+const KIOSK_SW = 0.84, KIOSK_SH = 2.10
+const POS_D = 0.60, POS_H = 1.26, POS_WW = 1.20
+const POS_X = -(RW / 2) + WT + POS_D / 2, POS_Z = -0.84
+const MG_X = -(RW / 2) + WT + 0.56, MG_Z = (RD / 2) - WT - 0.77
+const LB_W = 0.90, LB_H = 0.70
 const LB_Z = -(RD / 2) + WT + 0.06
-const LB1_X = -0.38, LB2_X = 0.38
+const LB1_X = -0.55, LB2_X = 0.55
 
 const WALL_COL  = '#1c1915'
 const CEIL_COL  = '#0d0b09'
@@ -42,8 +45,8 @@ const TREAD_COL = '#7a5530'
 const RISER_COL = '#342010'
 const RAIL_COL  = '#5a3820'
 
-// Level 01/02 stacking
-const L1_H = 3.0, L1_GAP = 0.6, L2_Y = L1_H + L1_GAP
+// Level 01/02 stacking — ceiling raised to 3.6 m
+const L1_H = 3.60, L1_GAP = 0.6, L2_Y = L1_H + L1_GAP
 const S = LAYOUT_SCALE, HS = HEIGHT_SCALE
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -145,7 +148,7 @@ function makeKioskCanvas() {
 // ── Level 01 — Entrance Chamber ───────────────────────────────────────────────
 
 function buildEntranceChamber(g) {
-  const woodTex = woodTexture(); woodTex.repeat.set(RW / 2.5, RD / 2.5)
+  const woodTex = woodTexture(); woodTex.repeat.set(RW / 3.0, RD / 3.0)
   const treadTex = woodTexture(); treadTex.repeat.set(2, 0.5)
 
   const bannerCanvas = makeBannerCanvas()
@@ -280,14 +283,22 @@ function buildEntranceChamber(g) {
     g.add(box(SW, topY, SD, m, { pos: [FA_CX, topY / 2, cz], cast: true, recv: true }))
   }
 
-  // Handrail A — wall side, slope-aligned
-  const stairAngle = Math.atan2(NS * SR, NS * SD)
-  const railLen = Math.hypot(NS * SD, NS * SR) + 0.2
-  const railA = box(0.06, 0.06, railLen, mRail, {
-    pos: [FA_X1 - 0.03, FLIGHT_TOP_Y * 0.55 + 0.45, (FA_BASE_Z + FA_TOP_Z) / 2],
+  // Handrail A — left wall side, snapped to step noses + 0.9 m vertical
+  // Rotation convention: box local +Z aligns along the slope.
+  // For Flight A (climbing in -Z direction), rot.x = +stairAngle places
+  // local +Z toward the base (FA_BASE_Z, low) and local -Z toward FA_TOP_Z (high).
+  // The rail Y-centre at the flight Z-midpoint = midpoint step nose height + 0.9 m.
+  //   midpoint step nose height = FLIGHT_TOP_Y / 2
+  //   so Y_centre = FLIGHT_TOP_Y / 2 + 0.9
+  // This guarantees 0.9 m above floor at the base and 0.9 m above landing at the top.
+  const stairAngle = Math.atan2(SR, SD)           // slope angle (same per step)
+  const railLen    = Math.hypot(NS * SD, NS * SR) + 0.30
+  const railAY     = FLIGHT_TOP_Y / 2 + 0.90
+  const railAX     = FA_X1 + 0.08               // inset from left-wall inner face
+  g.add(box(0.08, 0.08, railLen, mRail, {
+    pos: [railAX, railAY, (FA_BASE_Z + FA_TOP_Z) / 2],
     rot: [stairAngle, 0, 0], cast: true,
-  })
-  g.add(railA)
+  }))
 
   // ── Landing ───────────────────────────────────────────────────────────────
   const landW = SW * 2 + SP_W
@@ -303,12 +314,17 @@ function buildEntranceChamber(g) {
     g.add(box(SW, topY, SD, m, { pos: [FB_CX, topY / 2, cz], cast: true, recv: true }))
   }
 
-  // Handrail B — spine side
-  const railB = box(0.06, 0.06, railLen, mRail, {
-    pos: [FB_X1 + 0.03, FLIGHT_TOP_Y + NS * SR * 0.5 + 0.40, (FB_BASE_Z + FB_TOP_Z) / 2],
+  // Handrail B — spine-wall side, same logic
+  // Flight B climbs in +Z direction so rot.x = -stairAngle.
+  // B starts at FLIGHT_TOP_Y (landing surface) and rises to 2×FLIGHT_TOP_Y.
+  //   midpoint step nose height = FLIGHT_TOP_Y + FLIGHT_TOP_Y / 2 = FLIGHT_TOP_Y * 1.5
+  //   Y_centre = FLIGHT_TOP_Y * 1.5 + 0.9
+  const railBY  = FLIGHT_TOP_Y * 1.5 + 0.90
+  const railBX  = FB_X1 + 0.08               // inset from spine-wall face into flight B
+  g.add(box(0.08, 0.08, railLen, mRail, {
+    pos: [railBX, railBY, (FB_BASE_Z + FB_TOP_Z) / 2],
     rot: [-stairAngle, 0, 0], cast: true,
-  })
-  g.add(railB)
+  }))
 
   // ── Spine wall ────────────────────────────────────────────────────────────
   const spineLen = FA_BASE_Z - LAND_Z2
@@ -381,10 +397,10 @@ let _floorsCache = null
 export function getFloors() {
   if (_floorsCache) return _floorsCache
 
-  // Floor 0 — Level 01 entrance
-  const hx = (RW / 2) / LAYOUT_SCALE
-  const hz = (RD / 2) / LAYOUT_SCALE
-  const ins = (WT / LAYOUT_SCALE) + 0.05
+  // Floor 0 — Level 01 entrance (footprint in plan units = world / LAYOUT_SCALE)
+  const hx  = (RW / 2) / LAYOUT_SCALE
+  const hz  = (RD / 2) / LAYOUT_SCALE
+  const ins = (WT / LAYOUT_SCALE) + 0.06
   const f0 = {
     floorY: 0,
     footprint: [
@@ -394,7 +410,8 @@ export function getFloors() {
       { x: -hx + ins, z:  hz - ins },
     ],
     walls: [],
-    spawn: [DOOR_CX - 0.15, (RD / 2) - 0.55],
+    // Spawn just inside the entrance doorway (world X/Z)
+    spawn: [DOOR_CX - 0.20, (RD / 2) - 0.75],
     short: 'L1',
     centerW: [0, 0],
   }
