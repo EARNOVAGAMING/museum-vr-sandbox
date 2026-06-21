@@ -58,10 +58,12 @@ const FB_TOP_Z  = FB_BASE_Z + NS * SD   // = -0.62 + 1.82 = 1.2
 // FURNITURE / FIXTURES
 // ─────────────────────────────────────────────────────────────────────────────
 // Welcome LED banner — right wall, near entrance (from floorplan: "Welcome LED" right side)
-const BAN_W   = 1.0
-const BAN_H   = 2.5
-const BAN_BOT = 0.25
-const BAN_Z   = 1.2     // Z position along right wall
+// Banner sized to fill a prominent section of the right wall — portrait ratio ~1:2.5
+// matches the real artwork's tall narrow format
+const BAN_W   = 1.6    // width (portrait banner, fits right wall without crowding)
+const BAN_H   = 3.2    // height (nearly floor-to-ceiling at 3.8m room, bottom gap below)
+const BAN_BOT = 0.25   // gap above floor
+const BAN_Z   = 0.8    // Z position along right wall (centred in the near-entrance section)
 // POS counter — left wall, mid room
 const POS_W = 1.0, POS_H = 0.9, POS_D = 0.55
 const POS_X = -(RW / 2) + WT + POS_D / 2
@@ -325,9 +327,18 @@ export default function EntranceChamber({ yOffset = 0 }) {
     const wood   = woodTexture();    wood.repeat.set(RW / 3, RD / 3)
     const plstr  = plasterTexture(CREAM); plstr.repeat.set(3, 2)
     const tread  = woodTexture();    tread.repeat.set(2, 0.5)
-    const banner = makeBannerCanvas()
+    // Load real banner image; falls back to canvas automatically if file missing
+    const bannerCanvas = makeBannerCanvas()
+    const banner = new THREE.TextureLoader().load(
+      '/museum-vr-sandbox/textures/welcome-banner.png',
+      (t) => { bannerCanvas.dispose(); Object.assign(bannerCanvas, t); bannerCanvas.needsUpdate = true },
+      undefined,
+      () => { /* 404 — canvas stays */ }
+    )
+    // Start with canvas; TextureLoader replaces it in-place when image loads
+    const bannerTex = bannerCanvas
     const kiosk  = makeKioskTex()
-    return { wood, plstr, tread, banner, kiosk }
+    return { wood, plstr, tread, banner: bannerTex, kiosk }
   }, [])
 
   const y = yOffset
@@ -358,9 +369,9 @@ export default function EntranceChamber({ yOffset = 0 }) {
       {/* Banner spotlight */}
       <spotLight
         ref={spotRef}
-        position={[banX - 1.2, y + RH - 0.25, BAN_Z + 1.2]}
-        intensity={60}
-        angle={0.38}
+        position={[banX - 1.5, y + RH - 0.25, BAN_Z + 0.5]}
+        intensity={80}
+        angle={0.45}
         penumbra={0.38}
         distance={RH + 2}
         decay={1.2}
@@ -427,28 +438,27 @@ export default function EntranceChamber({ yOffset = 0 }) {
         <meshStandardMaterial color={CREAM} roughness={0.82} map={tex.plstr} />
       </mesh>
 
-      {/* ══ WELCOME LED BANNER — right wall ═══════════════════════════════════ */}
-      {/* Frame */}
-      <mesh position={[banX, banY, BAN_Z]} castShadow>
-        <boxGeometry args={[0.07, BAN_H + 0.10, BAN_W + 0.10]} />
-        <meshStandardMaterial color="#1a1814" roughness={0.4} />
+      {/* ══ WELCOME LED BANNER — right wall, portrait, full artwork visible ══ */}
+      {/* Backing panel + frame border */}
+      <mesh position={[banX, banY, BAN_Z]} castShadow receiveShadow>
+        <boxGeometry args={[0.08, BAN_H + 0.14, BAN_W + 0.14]} />
+        <meshStandardMaterial color="#111008" roughness={0.35} metalness={0.15} />
       </mesh>
-      {/* Screen */}
-      <mesh position={[banX - 0.05, banY, BAN_Z]}>
+      {/* Gold frame inset */}
+      <mesh position={[banX - 0.02, banY, BAN_Z]}>
+        <boxGeometry args={[0.03, BAN_H + 0.06, BAN_W + 0.06]} />
+        <meshStandardMaterial color="#c9a84c" roughness={0.3} metalness={0.6} />
+      </mesh>
+      {/* The banner artwork — single plane facing into the room (-X direction) */}
+      <mesh position={[banX - 0.05, banY, BAN_Z]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[BAN_W, BAN_H]} />
         <meshStandardMaterial
           map={tex.banner}
-          emissive="#4a3010"
-          emissiveIntensity={0.25}
-          roughness={0.85}
-          side={THREE.FrontSide}
-          rotation={[0, -Math.PI / 2, 0]}
+          emissive="#3a2808"
+          emissiveIntensity={0.18}
+          roughness={0.88}
+          toneMapped={false}
         />
-      </mesh>
-      {/* Screen plane: face left (toward room) — the plane is in YZ, rotated */}
-      <mesh position={[banX - 0.05, banY, BAN_Z]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[BAN_W, BAN_H]} />
-        <meshStandardMaterial map={tex.banner} emissive="#4a3010" emissiveIntensity={0.25} roughness={0.85} />
       </mesh>
 
       {/* ══ POS COUNTER — left wall ═══════════════════════════════════════════ */}
