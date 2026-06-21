@@ -239,7 +239,7 @@ export const floorOffset = (l1) => (l1 ? l1.height * HS + FLOOR_GAP : 0)
 
 // Level 01 uses the hand-crafted EntranceChamber instead of the generic Level.
 // Level 02 height in world metres — used to offset the second floor.
-const L1_HEIGHT_WORLD = 3.2
+const L1_HEIGHT_WORLD = 3.8
 const L1_GAP = 0.6
 
 export { getEntranceChamberFloorData }

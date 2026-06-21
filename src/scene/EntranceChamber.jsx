@@ -6,9 +6,9 @@ import { LAYOUT_SCALE } from '../data/museumMapModel'
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOM SHAPE — matches architect floorplan: narrow portrait room
 // ─────────────────────────────────────────────────────────────────────────────
-const RW = 4.2    // width  X  (~3.5m + bit extra for comfort)
-const RD = 7.0    // depth  Z
-const RH = 3.2    // height Y
+const RW = 5.0    // width  X
+const RD = 9.0    // depth  Z
+const RH = 3.8    // height Y
 const WT = 0.25   // wall thickness
 
 // Doorway — right side of front wall (Z+), player enters bottom-right
@@ -23,11 +23,11 @@ const DOOR_CX = (RW / 2) - WT - DW / 2 - 0.05   // doorway centre X (right side)
 // Flight B: right side of A, returns +Z (back toward entrance) but climbing
 // Both flights side-by-side with a spine wall between them
 // ─────────────────────────────────────────────────────────────────────────────
-const SW   = 1.0    // each flight tread width
-const SR   = 0.20   // step rise
-const SD   = 0.26   // step run (depth)
-const NS   = 7      // steps per flight  → top of each flight = 1.4 m
-const SP_W = 0.20   // central spine wall
+const SW   = 1.1    // each flight tread width
+const SR   = 0.16   // step rise (gentler)
+const SD   = 0.28   // step run (depth)
+const NS   = 7      // steps per flight  → top of each flight = 1.12 m
+const SP_W = 0.20   // central spine wall thickness
 
 // X extents — stair block hugs left wall
 const FA_X1 = -(RW / 2) + WT             // left edge of flight A = left wall inner
@@ -42,7 +42,7 @@ const FB_X2 = FB_X1 + SW
 const FB_CX = (FB_X1 + FB_X2) / 2
 
 // Z extents
-const FA_BASE_Z  = 2.2              // Z of first step bottom of flight A (near entrance)
+const FA_BASE_Z  = -1.0             // stairs start in back half of room (away from entrance)
 const FA_TOP_Z   = FA_BASE_Z - NS * SD    // = 2.2 - 1.82 = 0.38  (top of flight A)
 const LAND_DEPTH = 1.0
 const LAND_Z2    = FA_TOP_Z - LAND_DEPTH  // far edge of landing
@@ -339,7 +339,9 @@ export default function EntranceChamber({ yOffset = 0 }) {
   // Spine wall covers the full stair Z range + landing
   const SPINE_Z_LEN = (FA_BASE_Z - LAND_Z2) + 0.01   // total Z depth of stair block
   const SPINE_Z_MID = (FA_BASE_Z + LAND_Z2) / 2
-  const STAIR_FULL_Y = FLIGHT_TOP_Y * 2    // ≈ 2.8m — top of flight B
+  const STAIR_FULL_Y = FLIGHT_TOP_Y * 2              // total stair height ≈ 2.24m
+  // Spine wall only rises to handrail height above upper flight top — a visible half-wall
+  const SPINE_HEIGHT = STAIR_FULL_Y + 0.15           // just above top step, not ceiling-high
 
   return (
     <group>
@@ -572,8 +574,8 @@ export default function EntranceChamber({ yOffset = 0 }) {
       })}
 
       {/* SPINE WALL — runs the full Z length of the stair block */}
-      <mesh position={[(SPN_X1 + SPN_X2) / 2, y + STAIR_FULL_Y / 2, SPINE_Z_MID]} castShadow receiveShadow>
-        <boxGeometry args={[SP_W, STAIR_FULL_Y, SPINE_Z_LEN]} />
+      <mesh position={[(SPN_X1 + SPN_X2) / 2, y + SPINE_HEIGHT / 2, SPINE_Z_MID]} castShadow receiveShadow>
+        <boxGeometry args={[SP_W, SPINE_HEIGHT, SPINE_Z_LEN]} />
         <meshStandardMaterial color={DARK} roughness={0.8} />
       </mesh>
 
@@ -584,8 +586,8 @@ export default function EntranceChamber({ yOffset = 0 }) {
         <meshStandardMaterial color={RISER} roughness={0.72} />
       </mesh>
       {/* Flight B outer (right) — same */}
-      <mesh position={[FB_X2 + 0.06, y + STAIR_FULL_Y / 2, (FB_BASE_Z + FB_TOP_Z) / 2]} castShadow>
-        <boxGeometry args={[0.12, STAIR_FULL_Y, NS * SD]} />
+      <mesh position={[FB_X2 + 0.06, y + SPINE_HEIGHT / 2, (FB_BASE_Z + FB_TOP_Z) / 2]} castShadow>
+        <boxGeometry args={[0.12, SPINE_HEIGHT, NS * SD]} />
         <meshStandardMaterial color={RISER} roughness={0.72} />
       </mesh>
 
