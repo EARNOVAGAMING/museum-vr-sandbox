@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { buildMuseum, getFloors } from './Museum.js'
+import { buildMuseum, getFloors, getTriggers } from './Museum.js'
 import { FirstPerson } from './FirstPerson.js'
 
 export class SceneManager {
@@ -39,7 +39,7 @@ export class SceneManager {
     this.orbit.enabled = false
 
     // ── First-person ────────────────────────────────────────────────────────
-    this.fp = new FirstPerson(this.camera, canvas, this.floors)
+    this.fp = new FirstPerson(this.camera, canvas, this.floors, getTriggers())
     this.fp.enabled = true
 
     // ── VR controllers (simple pointer ray in VR) ────────────────────────────

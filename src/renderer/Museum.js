@@ -9,27 +9,25 @@ const RW = 4.60, RD = 7.70, RH = 3.60, WT = 0.28
 const DW = 1.40, DH = 2.45
 const DOOR_CX = (RW / 2) - WT - DW / 2
 
-// Staircase ×1.4 — proportions identical, just roomier
-const SW = 1.26, SR = 0.24, SD = 0.38, NS = 7, SP_W = 0.17
-const FA_X1 = -(RW / 2) + WT
-const FA_X2 = FA_X1 + SW
-const FA_CX = (FA_X1 + FA_X2) / 2
-const SPN_X1 = FA_X2, SPN_X2 = SPN_X1 + SP_W
-const FB_X1 = SPN_X2
-const FB_X2 = FB_X1 + SW
-const FB_CX = (FB_X1 + FB_X2) / 2
-const FA_BASE_Z  = (RD / 2) - WT - 0.56    // 0.40 × 1.4
-const FA_TOP_Z   = FA_BASE_Z - NS * SD
-const LAND_D     = 1.12                     // 0.80 × 1.4
-const LAND_Z2    = FA_TOP_Z - LAND_D
-const LAND_MID_Z = (FA_TOP_Z + LAND_Z2) / 2
-const FLIGHT_TOP_Y = NS * SR               // 7 × 0.24 = 1.68 m
-const FB_BASE_Z  = LAND_Z2
-const FB_TOP_Z   = FB_BASE_Z + NS * SD
+// Staircase — single straight flight, visual prop only (no collision)
+// Kept against left wall, climbing toward back wall (-Z)
+const SW = 1.26, SR = 0.22, SD = 0.36, NS = 10, SP_W = 0.17
+const STAIR_X1  = -(RW / 2) + WT           // left wall inner face
+const STAIR_X2  = STAIR_X1 + SW
+const STAIR_CX  = (STAIR_X1 + STAIR_X2) / 2
+const STAIR_BASE_Z = (RD / 2) - WT - 0.56  // near the front
+const STAIR_TOP_Z  = STAIR_BASE_Z - NS * SD // toward the back wall
+const STAIR_TOP_Y  = NS * SR               // 10 × 0.22 = 2.20 m
+
+// Trigger zone (world coords) — a box at the stair base the player walks into
+const TRIG_MIN_X = STAIR_X1 - 0.20
+const TRIG_MAX_X = STAIR_X2 + 0.60
+const TRIG_MIN_Z = STAIR_BASE_Z - 0.80
+const TRIG_MAX_Z = STAIR_BASE_Z + 0.55
 
 // Furniture ×1.4
 const BAN_H = 3.20, BAN_W = 1.00, BAN_BOT = 0.25, BAN_Z = 0.10
-const KIOSK_X = FB_X2 + 0.20, KIOSK_Z = FA_BASE_Z - 0.42
+const KIOSK_X = STAIR_X2 + 0.20, KIOSK_Z = STAIR_BASE_Z - 0.50
 const KIOSK_SW = 0.84, KIOSK_SH = 2.10
 const POS_D = 0.60, POS_H = 1.26, POS_WW = 1.20
 const POS_X = -(RW / 2) + WT + POS_D / 2, POS_Z = -0.84
@@ -200,8 +198,8 @@ function buildEntranceChamber(g) {
   g.add(new THREE.AmbientLight('#ffd090', 0.18))
   g.add(pt('#ffb060', 3.5, 3.5, 2, [ 0.3, RH - 0.15,  1.0]))
   g.add(pt('#ffb060', 3.0, 3.5, 2, [-0.2, RH - 0.15, -1.5]))
-  g.add(pt('#ffcc88', 4.0, 3.0, 2, [FA_CX, RH - 0.3, FA_BASE_Z - 0.5]))
-  g.add(pt('#ffcc88', 4.0, 3.0, 2, [FB_CX, RH - 0.3, FB_TOP_Z  - 0.5]))
+  g.add(pt('#ffcc88', 4.0, 3.0, 2, [STAIR_CX, RH - 0.3, STAIR_BASE_Z - 0.5]))
+  g.add(pt('#ffcc88', 4.0, 3.0, 2, [STAIR_CX, RH - 0.3, STAIR_TOP_Z  + 0.5]))
 
   const banX  = (RW / 2) - WT - 0.03
   const banCY = BAN_BOT + BAN_H / 2
@@ -275,63 +273,39 @@ function buildEntranceChamber(g) {
     g.add(box(LB_W, LB_H, 0.06, mLightbox, { pos: [lx, RH * 0.68, LB_Z], cast: true }))
   }
 
-  // ── Staircase — Flight A ──────────────────────────────────────────────────
+  // ── STAIRCASE — visual prop only, single straight flight ─────────────────
+  // Solid-fill steps climbing from STAIR_BASE_Z toward back wall (-Z)
   for (let i = 0; i < NS; i++) {
     const topY = (i + 1) * SR
-    const cz   = FA_BASE_Z - i * SD - SD / 2
-    const m = i % 2 === 0 ? mTread : mRiser
-    g.add(box(SW, topY, SD, m, { pos: [FA_CX, topY / 2, cz], cast: true, recv: true }))
+    const cz   = STAIR_BASE_Z - i * SD - SD / 2
+    g.add(box(SW, topY, SD, i % 2 === 0 ? mTread : mRiser, {
+      pos: [STAIR_CX, topY / 2, cz], cast: true, recv: true,
+    }))
   }
-
-  // Handrail A — left wall side, snapped to step noses + 0.9 m vertical
-  // Rotation convention: box local +Z aligns along the slope.
-  // For Flight A (climbing in -Z direction), rot.x = +stairAngle places
-  // local +Z toward the base (FA_BASE_Z, low) and local -Z toward FA_TOP_Z (high).
-  // The rail Y-centre at the flight Z-midpoint = midpoint step nose height + 0.9 m.
-  //   midpoint step nose height = FLIGHT_TOP_Y / 2
-  //   so Y_centre = FLIGHT_TOP_Y / 2 + 0.9
-  // This guarantees 0.9 m above floor at the base and 0.9 m above landing at the top.
-  const stairAngle = Math.atan2(SR, SD)           // slope angle (same per step)
+  // Side stringer (right side, closes the open face)
+  g.add(box(0.10, STAIR_TOP_Y, NS * SD, mRiser, {
+    pos: [STAIR_X2 + 0.05, STAIR_TOP_Y / 2, (STAIR_BASE_Z + STAIR_TOP_Z) / 2],
+  }))
+  // Handrail — wall side, slope-aligned, precisely 0.9 m above step noses
+  const stairAngle = Math.atan2(SR, SD)
   const railLen    = Math.hypot(NS * SD, NS * SR) + 0.30
-  const railAY     = FLIGHT_TOP_Y / 2 + 0.90
-  const railAX     = FA_X1 + 0.08               // inset from left-wall inner face
+  const railY      = STAIR_TOP_Y / 2 + 0.90
   g.add(box(0.08, 0.08, railLen, mRail, {
-    pos: [railAX, railAY, (FA_BASE_Z + FA_TOP_Z) / 2],
+    pos: [STAIR_X1 + 0.08, railY, (STAIR_BASE_Z + STAIR_TOP_Z) / 2],
     rot: [stairAngle, 0, 0], cast: true,
   }))
 
-  // ── Landing ───────────────────────────────────────────────────────────────
-  const landW = SW * 2 + SP_W
-  const landX = (FA_X1 + FB_X2) / 2
-  g.add(box(landW, FLIGHT_TOP_Y, LAND_D, mRiser, { pos: [landX, FLIGHT_TOP_Y / 2, LAND_MID_Z], cast: true, recv: true }))
-  g.add(box(landW, 0.03, LAND_D, mTread, { pos: [landX, FLIGHT_TOP_Y + 0.015, LAND_MID_Z], recv: true }))
-
-  // ── Staircase — Flight B ──────────────────────────────────────────────────
-  for (let i = 0; i < NS; i++) {
-    const topY = FLIGHT_TOP_Y + (i + 1) * SR
-    const cz   = FB_BASE_Z + i * SD + SD / 2
-    const m = i % 2 === 0 ? mTread : mRiser
-    g.add(box(SW, topY, SD, m, { pos: [FB_CX, topY / 2, cz], cast: true, recv: true }))
-  }
-
-  // Handrail B — spine-wall side, same logic
-  // Flight B climbs in +Z direction so rot.x = -stairAngle.
-  // B starts at FLIGHT_TOP_Y (landing surface) and rises to 2×FLIGHT_TOP_Y.
-  //   midpoint step nose height = FLIGHT_TOP_Y + FLIGHT_TOP_Y / 2 = FLIGHT_TOP_Y * 1.5
-  //   Y_centre = FLIGHT_TOP_Y * 1.5 + 0.9
-  const railBY  = FLIGHT_TOP_Y * 1.5 + 0.90
-  const railBX  = FB_X1 + 0.08               // inset from spine-wall face into flight B
-  g.add(box(0.08, 0.08, railLen, mRail, {
-    pos: [railBX, railBY, (FB_BASE_Z + FB_TOP_Z) / 2],
-    rot: [-stairAngle, 0, 0], cast: true,
-  }))
-
-  // ── Spine wall ────────────────────────────────────────────────────────────
-  const spineLen = FA_BASE_Z - LAND_Z2
-  const spineMidZ = (FA_BASE_Z + LAND_Z2) / 2
-  const spineH = FLIGHT_TOP_Y * 2 + SR + 0.10
-  g.add(box(SP_W, spineH, spineLen, mSpine, {
-    pos: [(SPN_X1 + SPN_X2) / 2, spineH / 2, spineMidZ], cast: true, recv: true,
+  // ── TRIGGER ZONE — glowing floor patch at stair base ─────────────────────
+  // A subtle emissive plane on the floor signals "walk here → go to Level 2"
+  const mTrigger = new THREE.MeshStandardMaterial({
+    color: '#c9a84c', emissive: new THREE.Color('#c9a84c'),
+    emissiveIntensity: 0.35, roughness: 0.9, transparent: true, opacity: 0.55,
+  })
+  const trigW = TRIG_MAX_X - TRIG_MIN_X
+  const trigD = TRIG_MAX_Z - TRIG_MIN_Z
+  g.add(plane(trigW, trigD, mTrigger, {
+    pos: [(TRIG_MIN_X + TRIG_MAX_X) / 2, 0.01, (TRIG_MIN_Z + TRIG_MAX_Z) / 2],
+    rot: [-Math.PI / 2, 0, 0],
   }))
 }
 
@@ -388,6 +362,18 @@ function buildLevel2(g, spec, yOffset) {
     g.add(pt(l.color || '#ffe1b0', (l.intensity || 4) * 4.5, (l.range || 4) * S * 1.6, 1.6,
       [l.x * S, yOffset + (l.y || 2.5) * HS, l.z * S]))
   }
+}
+
+// ── Triggers — world-space boxes that jump the player to another floor ─────────
+
+export function getTriggers() {
+  return [
+    {
+      onFloor: 0,
+      toFloor: 1,
+      box: { minX: TRIG_MIN_X, maxX: TRIG_MAX_X, minZ: TRIG_MIN_Z, maxZ: TRIG_MAX_Z },
+    },
+  ]
 }
 
 // ── Collision floor data ───────────────────────────────────────────────────────

@@ -18,11 +18,12 @@ function distToSeg(px, pz, ax, az, bx, bz) {
 }
 
 export class FirstPerson {
-  constructor(camera, canvas, floors = [], speed = 6) {
+  constructor(camera, canvas, floors = [], triggers = [], speed = 6) {
     this.camera = camera
     this.canvas = canvas
-    this.floors = floors
-    this.speed = speed
+    this.floors   = floors
+    this.triggers = triggers
+    this.speed    = speed
     this.enabled = false
 
     this.yaw   = Math.PI
@@ -96,9 +97,17 @@ export class FirstPerson {
     }
     this.camera.position.y = baseY
 
-    // Stair triggers
+    // Trigger zones — walk into the glowing patch to jump floors
     if (this.cool > 0) { this.cool -= dt; return }
-    // (no auto triggers currently — use UI buttons)
+    const cx = this.camera.position.x, cz = this.camera.position.z
+    for (const t of this.triggers) {
+      if (t.onFloor !== fi) continue
+      const b = t.box
+      if (cx >= b.minX && cx <= b.maxX && cz >= b.minZ && cz <= b.maxZ) {
+        this.jumpToFloor(t.toFloor)
+        break
+      }
+    }
   }
 
   dispose() {
